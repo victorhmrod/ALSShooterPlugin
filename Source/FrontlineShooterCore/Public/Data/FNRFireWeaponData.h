@@ -43,6 +43,8 @@ public:
 	int32 MaxAmmoInMag = 31;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite,  Category = "FireWeapon|Ammo")
 	float ReloadTime = 2.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FireWeapon|Behavior|Ammo")
+	float InspectionCameraLength = 50.0f;	
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite,  Category = "FireWeapon|Shot")
 	TEnumAsByte<EFireMode_PRAS> StartFireMode{Auto};
@@ -176,6 +178,7 @@ public:
 		WeaponData.FireAnimationMode = WeaponDataAsset->FireAnimationMode;
 		WeaponData.MinMaxVelocity = WeaponDataAsset->MinMaxVelocity;
 		WeaponData.MaxVelocitySpeed = WeaponDataAsset->MaxVelocitySpeed;
+		WeaponData.InspectionCameraLength = WeaponDataAsset->InspectionCameraLength;
 		
 		return WeaponData;
 	}

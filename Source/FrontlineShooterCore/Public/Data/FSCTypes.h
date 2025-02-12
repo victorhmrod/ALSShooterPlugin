@@ -247,6 +247,8 @@ struct FFireWeaponData : public FTableRowBase
 	int32 MaxAmmoInMag = 31;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FireWeapon|Behavior|Ammo")
 	float ReloadTime = 2.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FireWeapon|Behavior|Ammo")
+	float InspectionCameraLength = 50.0f;	
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FireWeapon|Behavior|Fire")
 	TEnumAsByte<EFireMode_PRAS> StartFireMode{Auto};
