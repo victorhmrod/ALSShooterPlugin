@@ -337,11 +337,31 @@ void UFNRWeaponComponent::DestroyAllWeapons()
 
 void UFNRWeaponComponent::Server_DestroyAllWeapons_Implementation()
 {
-	for (const auto& ArrayElement : GetAllWeapons())
+	for (AFNRWeapon* Weapon : GetAllWeapons())
 	{
-		ArrayElement->Destroy(true);
+		if (!IsValid(Weapon))
+		{
+			continue;
+		}
+
+		// Check if it's a fire weapon and destroy its attachments first
+		const AFNRFireWeapon* FoundFireWeapon = Cast<AFNRFireWeapon>(Weapon);
+		if (FoundFireWeapon)
+		{
+			for (AFNRAttachment* Attachment : FoundFireWeapon->AttachmentComponent->GetAttachments())
+			{
+				if (IsValid(Attachment))
+				{
+					Attachment->Destroy(true);
+				}
+			}
+		}
+
+		// Destroy the weapon itself
+		Weapon->Destroy(true);
 	}
 
+	// Broadcast the weapon unequip event
 	OnEquipOrUnEquipWeapon.Broadcast(nullptr);
 }
 

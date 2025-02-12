@@ -14,6 +14,7 @@
 #include "Code/FNRAttachmentWeaponComponent.h"
 #include "Code/FNRCartridgeProjectile.h"
 #include "Code/FNRRocketProjectile.h"
+#include "Components/ArrowComponent.h"
 #include "Core/InteractableComponent.h"
 #include "Data/FNRAttachmentData.h"
 #include "Data/FNRFireWeaponData.h"
@@ -32,7 +33,7 @@ AFNRFireWeapon::AFNRFireWeapon()
 	MagazineComponent->SetupAttachment(MeshComponent);
 	MagazineComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	MagazineComponent->SetReceivesDecals(false);
-	IronsightLocationComponent = CreateDefaultSubobject<USceneComponent>(FName{TEXTVIEW("IronsightCamera")});
+	IronsightLocationComponent = CreateDefaultSubobject<UArrowComponent>(FName{TEXTVIEW("IronsightCamera")});
 	IronsightLocationComponent->SetupAttachment(MeshComponent);
 	RecoilAnimationComponent = CreateDefaultSubobject<URecoilAnimationComponent>(FName{TEXTVIEW("RecoilAnimationComponent")});
 	RotatingMovementComponent = CreateDefaultSubobject<URotatingMovementComponent>(FName{TEXTVIEW("RotatingMovementComponent")});
@@ -90,9 +91,9 @@ void AFNRFireWeapon::ReadValues()
 	Super::ReadValues();
 	
 	if (!IsValid(WeaponDataAsset)) return;
-	IronsightLocationComponent->AttachToComponent(MeshComponent, FAttachmentTransformRules::SnapToTargetIncludingScale, WeaponDataAsset->AimingCameraSocket);
-	MagazineComponent->AttachToComponent(MeshComponent, FAttachmentTransformRules::SnapToTargetIncludingScale, WeaponDataAsset->MagazineSocket);
 	Internal_FireWeaponData = WeaponDataAsset->AsStructure(WeaponDataAsset);
+	IronsightLocationComponent->AttachToComponent(MeshComponent, FAttachmentTransformRules::SnapToTargetIncludingScale, Internal_FireWeaponData.AimingCameraSocket);
+	MagazineComponent->AttachToComponent(MeshComponent, FAttachmentTransformRules::SnapToTargetIncludingScale, Internal_FireWeaponData.MagazineSocket);
 	if (IsValid(Internal_FireWeaponData.FireSound.LoadSynchronous()))
 	{
 		LoadedFireSound = Internal_FireWeaponData.FireSound.Get();
@@ -320,8 +321,8 @@ bool AFNRFireWeapon::BurstFire()
 void AFNRFireWeapon::ApplyRecoil()
 {
 	LastTimeCurve += Internal_FireWeaponData.RecoilVelocity;
-	float TargetPitchRecoil = Internal_FireWeaponData.RecoilPitchCurve->GetFloatValue(LastTimeCurve) * GetWeaponComponentInterface()->GetRecoilMultiplier();
-	float TargetYawRecoil = Internal_FireWeaponData.RecoilYawCurve->GetFloatValue(LastTimeCurve) * GetWeaponComponentInterface()->GetRecoilMultiplier();
+	float TargetPitchRecoil = Internal_FireWeaponData.RecoilPitchCurve->GetFloatValue(LastTimeCurve) * GetWeaponComponentInterface()->Execute_GetRecoilMultiplier(CharacterOwner);
+	float TargetYawRecoil = Internal_FireWeaponData.RecoilYawCurve->GetFloatValue(LastTimeCurve) * GetWeaponComponentInterface()->Execute_GetRecoilMultiplier(CharacterOwner);
 
 	if (const auto& Barrel = AttachmentComponent->GetAttachmentByType(EAttachmentType::Barrel))
 	{
@@ -372,9 +373,9 @@ FRotator AFNRFireWeapon::GetSpread(const FRotator& CurrentRotation, const float&
 {
 	if (!IsValid(CharacterOwner)) return FRotator::ZeroRotator;
 	const FRotator SpreadVector = FRotator{
-		CurrentRotation.Pitch + FMath::RandRange(Internal_FireWeaponData.SpreadRange.X / 10, Internal_FireWeaponData.SpreadRange.Y / 10) * GetWeaponComponentInterface()->GetSpreadMultiplier(),
-		CurrentRotation.Yaw + FMath::RandRange(Internal_FireWeaponData.SpreadRange.X / 10, Internal_FireWeaponData.SpreadRange.Y / 10) * GetWeaponComponentInterface()->GetSpreadMultiplier(),
-		CurrentRotation.Roll + FMath::RandRange(Internal_FireWeaponData.SpreadRange.X / 10, Internal_FireWeaponData.SpreadRange.Y / 10) * GetWeaponComponentInterface()->GetSpreadMultiplier()};
+		CurrentRotation.Pitch + FMath::RandRange(Internal_FireWeaponData.SpreadRange.X / 10, Internal_FireWeaponData.SpreadRange.Y / 10) * GetWeaponComponentInterface()->Execute_GetSpreadMultiplier(CharacterOwner),
+		CurrentRotation.Yaw + FMath::RandRange(Internal_FireWeaponData.SpreadRange.X / 10, Internal_FireWeaponData.SpreadRange.Y / 10) * GetWeaponComponentInterface()->Execute_GetSpreadMultiplier(CharacterOwner),
+		CurrentRotation.Roll + FMath::RandRange(Internal_FireWeaponData.SpreadRange.X / 10, Internal_FireWeaponData.SpreadRange.Y / 10) * GetWeaponComponentInterface()->Execute_GetSpreadMultiplier(CharacterOwner)};
 	return CharacterOwner->IsPlayerControlled() ? SpreadVector : SpreadVector * (FMath::GetMappedRangeValueUnclamped(FVector2D(0.0f, 100.0f), FVector2D(2.0f, 1.0f), Precision));
 }
 
@@ -623,7 +624,7 @@ void AFNRFireWeapon::SpawnCartridgeProjectile(const FTransform& ProjectileTransf
 	if (!IsValid(LoadedCartridgeProjectileClass)) return;
 	if (AFNRCartridgeProjectile* ProjectileRef = GetWorld()->SpawnActorDeferred<AFNRCartridgeProjectile>(LoadedCartridgeProjectileClass, ProjectileTransform, CharacterOwner, CharacterOwner))
 	{
-		ProjectileRef->Damage = FMath::FRandRange(Internal_FireWeaponData.DamageRange.X, Internal_FireWeaponData.DamageRange.Y) * GetWeaponComponentInterface()->GetDamageMultiplier();
+		ProjectileRef->Damage = FMath::FRandRange(Internal_FireWeaponData.DamageRange.X, Internal_FireWeaponData.DamageRange.Y);
 		if (const auto& Barrel = AttachmentComponent->GetAttachmentByType(EAttachmentType::Barrel))
 		{
 			ProjectileRef->Damage *= Barrel->Attachment->DamageMultiplier;
@@ -640,7 +641,7 @@ void AFNRFireWeapon::SpawnRocketProjectile(const FTransform& ProjectileTransform
 	if (!IsValid(LoadedCartridgeProjectileClass)) return;
 	if (AFNRRocketProjectile* ProjectileRef = GetWorld()->SpawnActorDeferred<AFNRRocketProjectile>(LoadedRocketProjectileClass, ProjectileTransform, CharacterOwner, CharacterOwner))
 	{
-		ProjectileRef->Damage = FMath::FRandRange(Internal_FireWeaponData.DamageRange.X, Internal_FireWeaponData.DamageRange.Y) * GetWeaponComponentInterface()->GetDamageMultiplier();
+		ProjectileRef->Damage = FMath::FRandRange(Internal_FireWeaponData.DamageRange.X, Internal_FireWeaponData.DamageRange.Y);
 		if (const auto& Barrel = AttachmentComponent->GetAttachmentByType(EAttachmentType::Barrel))
 		{
 			ProjectileRef->Damage *= Barrel->Attachment->DamageMultiplier;

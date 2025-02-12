@@ -8,21 +8,6 @@ FTransform IFNRWeaponComponentInterface::GetCameraTransform()
 	return FTransform::Identity;
 }
 
-float IFNRWeaponComponentInterface::GetSpreadMultiplier()
-{
-	return 0;
-}
-
-float IFNRWeaponComponentInterface::GetDamageMultiplier()
-{
-	return 0;
-}
-
-float IFNRWeaponComponentInterface::GetRecoilMultiplier()
-{
-	return 0;
-}
-
 void IFNRWeaponComponentInterface::OnStartThrowGrenade()
 {
 }

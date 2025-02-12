@@ -21,12 +21,15 @@ class FRONTLINESHOOTERCORE_API IFNRWeaponComponentInterface
 public:
 
 	virtual FTransform GetCameraTransform();
-	
-	virtual float GetSpreadMultiplier();
 
-	virtual float GetDamageMultiplier();
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Frontline|Weapon")
+	float GetSpreadMultiplier();
 
-	virtual float GetRecoilMultiplier();
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Frontline|Weapon")
+	float GetDamageMultiplier();
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Frontline|Weapon")
+	float GetRecoilMultiplier();
 	
 	virtual void OnStartThrowGrenade();
 

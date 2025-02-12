@@ -41,7 +41,7 @@ public:
 	TObjectPtr<class UFNRAttachmentWeaponComponent> AttachmentComponent;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
-	TObjectPtr<class USceneComponent> IronsightLocationComponent;
+	TObjectPtr<class UArrowComponent> IronsightLocationComponent;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TObjectPtr<class URecoilAnimationComponent> RecoilAnimationComponent;

@@ -74,18 +74,18 @@ void AFNRAttachment::OnDropItem_Implementation()
 
 void AFNRAttachment::Server_TryAddAttachment_Implementation(const AActor* Character)
 {
-	UFNRWeaponComponent* WeaponComponent = Character->GetComponentByClass<UFNRWeaponComponent>();
+	const UFNRWeaponComponent* WeaponComponent = Character->GetComponentByClass<UFNRWeaponComponent>();
+	UFNRInventoryComponent* InventoryComponent = Character->GetComponentByClass<UFNRInventoryComponent>();
 	if (WeaponComponent && WeaponComponent->EquippedFireWeapon)
 	{
-		AFNRFireWeapon* FoundWeapon = WeaponComponent->EquippedFireWeapon;
+		const AFNRFireWeapon* FoundWeapon = WeaponComponent->EquippedFireWeapon;
 		if (FoundWeapon->AttachmentComponent->AddAttachment(GetClass(), true))
 		{
 			Destroy(true);
 			UE_LOGFMT(LogFSC, Display, "{0} added to {1} with success", GetClass()->GetName(), FoundWeapon->GetName());
 		}
 	}
-	UFNRInventoryComponent* InventoryComponent = Character->GetComponentByClass<UFNRInventoryComponent>();
-	if (InventoryComponent)
+	else if (InventoryComponent)
 	{
 		ItemAddResult = InventoryComponent->TryAddItemFromClass(Attachment->ItemClass, 1);
 		if (ItemAddResult.Result != EItemAddResult::IAR_NoItemsAdded)
