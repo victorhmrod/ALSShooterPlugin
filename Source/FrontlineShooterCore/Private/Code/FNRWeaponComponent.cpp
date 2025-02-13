@@ -1090,7 +1090,8 @@ void UFNRWeaponComponent::AttachWeapon_Server_Implementation(AFNRWeapon* Weapon,
 		Weapon->AttachToComponent(ComponentOwnerCharacter->GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, HolsterSocket);
 		Weapon->SetActorRelativeRotation(FRotator::ZeroRotator);
 		Weapon->SetActorHiddenInGame(IsValid(Cast<AFNRGrenade>(Weapon)) ? true : bHideWeaponOnHolst);
-		if (AFNRFireWeapon* FireWeapon = Cast<AFNRFireWeapon>(Weapon); IsValid(FireWeapon) && FireWeapon->AttachmentComponent->GetAttachments().Num() > 0)
+		const AFNRFireWeapon* FireWeapon = Cast<AFNRFireWeapon>(Weapon);
+		if (FireWeapon && FireWeapon->AttachmentComponent->GetAttachments().Num() > 0)
 		{
 			for (const auto& ArrayElements: FireWeapon->AttachmentComponent->GetAttachments())
 			{
@@ -1229,6 +1230,7 @@ void UFNRWeaponComponent::DropWeapon_Server_Implementation(AFNRWeapon* WeaponToD
 		// Update bullets in weapon by local bullets in mag parameter
 		UpdateBullets(FireWeaponToDrop, LocalBulletsInMag);
 
+		/*
 		// Drop attachments in weapon
 		if (FireWeaponToDrop->AttachmentComponent->GetAttachments().Num() > 0)
 		{
@@ -1237,7 +1239,7 @@ void UFNRWeaponComponent::DropWeapon_Server_Implementation(AFNRWeapon* WeaponToD
 			{
 				FireWeaponToDrop->AttachmentComponent->RemoveAttachment(a, true);
 			}
-		}
+		}*/
 	}
 	// Check if weapons array contains this weapon
 	if (Weapons.Contains(WeaponToDrop))
