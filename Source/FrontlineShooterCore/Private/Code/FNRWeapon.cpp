@@ -283,11 +283,11 @@ FGeneralWeaponData AFNRWeapon::GetGeneralData() const
 
 void AFNRWeapon::GetFactors(float& SpreadFactor, float& DamageFactor, float& RecoilFactor) const
 {
-	DamageFactor = GetWeaponComponentInterface()->GetDamageMultiplier();
+	DamageFactor = GetWeaponComponentInterface()->Execute_GetDamageMultiplier(CharacterOwner);
 
-	SpreadFactor = GetWeaponComponentInterface()->GetSpreadMultiplier();
+	SpreadFactor = GetWeaponComponentInterface()->Execute_GetSpreadMultiplier(CharacterOwner);
 
-	RecoilFactor = GetWeaponComponentInterface()->GetRecoilMultiplier();
+	RecoilFactor = GetWeaponComponentInterface()->Execute_GetRecoilMultiplier(CharacterOwner);
 }
 
 bool AFNRWeapon::Fire(const bool bFire)

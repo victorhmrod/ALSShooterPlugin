@@ -30,6 +30,18 @@ UFNRAttachmentWeaponComponent::UFNRAttachmentWeaponComponent()
 void UFNRAttachmentWeaponComponent::BeginPlay()
 {
 	Super::BeginPlay();
+
+	Weapon = Cast<AFNRFireWeapon>(GetOwner());
+	if (!IsValid(Weapon))
+	{
+		
+		UE_LOGFMT(LogFSC, Error, "Weapon is invalid");
+		GetWorld()->GetTimerManager().SetTimer(ReassignAddAttachmentHandle, [this]
+		{
+			Weapon = Cast<AFNRFireWeapon>(GetOwner());
+		}, 1.0f, false);
+	}
+	
 	if (InitialAttachments.Num() > 0)
 	{
 		for (const auto& i : InitialAttachments)
@@ -37,7 +49,6 @@ void UFNRAttachmentWeaponComponent::BeginPlay()
 			AddAttachment(i);
 		}
 	}
-	Weapon = Cast<AFNRFireWeapon>(GetOwner());
 }
 
 void UFNRAttachmentWeaponComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -96,19 +107,27 @@ bool UFNRAttachmentWeaponComponent::WeaponContainsAttachmentByClass(const TSubcl
 bool UFNRAttachmentWeaponComponent::AddAttachment(const TSubclassOf<AFNRAttachment> AttachmentToAdd,
 	const bool bRemoveFromInventory)
 {
-	if (!IsValid(Weapon->CharacterOwner))
+	if (!IsValid(Weapon))
+	{
+		
+		UE_LOGFMT(LogFSC, Error, "Weapon is invalid");
+		GetWorld()->GetTimerManager().SetTimer(ReassignAddAttachmentHandle, [this]
+		{
+			Weapon = Cast<AFNRFireWeapon>(GetOwner());
+		}, 1.0f, false);
+	}
+	
+	if (IsValid(Weapon) && !IsValid(Weapon->CharacterOwner))
 	{
 		//UE_LOGFMT(LogFSC, Error, "`{Name}`: 'AttachmentToAdd' don't be added because Weapon->CharacterOwner Owner is invalid, retryig now", UKismetSystemLibrary::GetDisplayName(this));
-		const UWorld* World = GetWorld();
-		if (World)
+		
+		GetWorld()->GetTimerManager().SetTimer(ReassignAddAttachmentHandle, [&, AttachmentToAdd, bRemoveFromInventory]
 		{
-			World->GetTimerManager().SetTimer(ReassignAddAttachmentHandle, [&, AttachmentToAdd, bRemoveFromInventory]
-			{
-				AddAttachment(AttachmentToAdd, bRemoveFromInventory);
-			}, 1.0f, false);
-		}
+			AddAttachment(AttachmentToAdd, bRemoveFromInventory);
+		}, 1.0f, false);
 		return false;
 	}
+	
 	UE_LOGFMT(LogFSC, Warning, "'AttachmentToAdd' added because Weapon->CharacterOwner Owner is now valid");
 	AFNRAttachment* Attachment = AttachmentToAdd.GetDefaultObject();
 	if (!IsValid(Attachment))

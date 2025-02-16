@@ -435,6 +435,8 @@ void UFNRWeaponComponent::UnEquipWeapon(const bool bForceUnequip)
 		}
 		OnEquipOrUnEquipWeapon.Broadcast(nullptr);
 		UnEquipWeaponServer(bForceUnequip);
+
+		GetWeaponComponentInterface()->OnCharacterDropWeapon();
 	}
 }
 
