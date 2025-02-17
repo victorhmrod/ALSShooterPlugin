@@ -103,7 +103,12 @@ protected:
 	bool bWantsFire;
 
 private:
-	float LastTimeCurve = 0.0f;
+	float RecoilTime = 0.0f; // Tempo acumulado para a curva de recoil
+	float CurrentPitchRecoil = 0.0f; // Valor atual do recoil no eixo Pitch
+	float CurrentYawRecoil = 0.0f;   // Valor atual do recoil no eixo Yaw
+	
+protected:
+	bool bApplyingRecoil = false; // Indica se o recoil está sendo aplicado
 
 	int BulletsRemaining = -1;
 
@@ -172,7 +177,6 @@ protected:
 	#pragma region CPP Only
 protected:
 	FTimerHandle ResetRecoilTimerHandle;
-	void ApplyRecoil();
 	
 	FHitResult FireTrace();
 	
@@ -261,7 +265,15 @@ private:
 
 
 protected:
-	void RefreshRecoilOffset();
+	float LastRecoilUpdate{0};
+
+	float RecoilUpdateDelay{0.5f};
+	
+	void RefreshRecoilOffset(float DeltaTime);
+
+	FTimerHandle RecoilUpdateTimerHandle;
+	
+	float LastRecoilApplied{0.0f};
 	
 #pragma endregion Functions
 

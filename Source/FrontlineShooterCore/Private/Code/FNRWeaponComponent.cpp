@@ -88,7 +88,6 @@ void UFNRWeaponComponent::TickComponent(float DeltaTime, ELevelTick TickType, FA
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 	
 	if (!IsValid(ComponentOwnerCharacter)) return;
-	ResetRecoilRefresh(DeltaTime);
 	PredictGrenade();
 	if (IsValid(GetFocusedEnemy()) && IsValid(ComponentOwnerPlayerController))
 	{
@@ -127,34 +126,6 @@ void UFNRWeaponComponent::TickComponent(float DeltaTime, ELevelTick TickType, FA
 	else
 	{
 		SetFocusEnemy(nullptr);
-	}
-}
-
-void UFNRWeaponComponent::ResetRecoilRefresh(float DeltaTime)
-{
-	if (!IsValid(ComponentOwnerCharacter)) return;
-	if (EquippedFireWeapon && bIsInterpolatingRecoil && !bIsInspecting)
-	{
-		if (!EquippedFireWeapon->HasAmmo())
-		{
-			LastRecoilApplied = 0.0f;	
-			bIsInterpolatingRecoil = false;
-			return;
-		}
-		AController* Controller = ComponentOwnerCharacter->GetController();
-		if (Controller)
-		{
-			const FRotator CurrentRotation = Controller->GetControlRotation();
-			const FRotator TargetRotation = FRotator(OriginalPitch - LastRecoilApplied, CurrentRotation.Yaw, CurrentRotation.Roll);
-			const FRotator NewRotation = FMath::RInterpTo(CurrentRotation, TargetRotation, DeltaTime, RecoilInterpSpeed);
-			Controller->SetControlRotation(NewRotation);
-		}	
-		LastRecoilApplied = FMath::FInterpTo(LastRecoilApplied, 0.0f, DeltaTime, RecoilInterpSpeed);
-		if (FMath::IsNearlyZero(LastRecoilApplied, 1.0f))
-		{
-			LastRecoilApplied = 0.0f;
-			bIsInterpolatingRecoil = false;
-		}
 	}
 }
 
@@ -300,11 +271,6 @@ FRotator UFNRWeaponComponent::GetPredictedGrenadeRotation() const
 	return FRotator::ZeroRotator;
 }
 
-void UFNRWeaponComponent::ResetRecoil()
-{
-	bIsInterpolatingRecoil = true;
-}
-
 void UFNRWeaponComponent::SetCombatMode(const bool bCombatModeEnabled)
 {
 	GetWorld()->GetTimerManager().ClearTimer(DetectEnemyTimerHandle);
@@ -418,113 +384,158 @@ void UFNRWeaponComponent::EquipGrenade(const EGrenadeFilter GrenadeFilter)
 
 void UFNRWeaponComponent::UnEquipWeapon(const bool bForceUnequip)
 {
+	// Ensure the equipped weapon is valid before proceeding
 	if (!IsValid(EquippedWeapon)) return;
-	
+    
+	// Check if forced unequip is requested or if no montage is running
 	if (bForceUnequip || !bHasMontageRunning)
 	{
+		// Disable firing to prevent actions during unequip
 		Fire(false);
+
+		// Clear active timers for the equipped weapon
 		if (IsValid(EquippedFireWeapon))
 		{
-			InspectWeapon(false);
 			EquippedFireWeapon->GetWorldTimerManager().ClearTimer(EquippedFireWeapon->ReloadTimerHandle);
 			EquippedFireWeapon->GetWorldTimerManager().ClearTimer(EquippedFireWeapon->FireWithDelayTimerHandle);
 		}
+		// Prevent unequipping melee weapons if they do not allow weapon changes
 		else if (IsValid(EquippedMeleeWeapon) && !EquippedMeleeWeapon->bAllowChangeWeapon)
 		{
 			return;
 		}
-		OnEquipOrUnEquipWeapon.Broadcast(nullptr);
-		UnEquipWeaponServer(bForceUnequip);
 
-		GetWeaponComponentInterface()->OnCharacterDropWeapon();
+		// Broadcast the unequip event with a null weapon reference
+		OnEquipOrUnEquipWeapon.Broadcast(nullptr);
+
+		// Execute the unequip logic on the server
+		UnEquipWeaponServer(bForceUnequip);
 	}
 }
 
 void UFNRWeaponComponent::DropWeapon(AFNRWeapon* WeaponToDrop, const bool bSimulatePhysics)
 {
-	if (!WeaponToDrop) return;
-	if (!bHasMontageRunning)
-	{
-		if (WeaponToDrop == EquippedWeapon)
-		{
-			UnEquipWeapon(true);
-		}
-		DropWeapon_Server(WeaponToDrop, WeaponToDrop->IsA<AFNRFireWeapon>() ? Cast<AFNRFireWeapon>(WeaponToDrop)->BulletsInMag : 0, bSimulatePhysics);
-		OnEquipOrUnEquipWeapon.Broadcast(nullptr);
-	}
+    // Ensure the weapon is valid before proceeding
+    if (!WeaponToDrop) return;
+
+    // Prevent dropping if an animation montage is running
+    if (!bHasMontageRunning)
+    {
+        // Unequip the weapon if it's currently equipped
+        if (WeaponToDrop == EquippedWeapon)
+        {
+            UnEquipWeapon(true);
+        }
+
+        // Call the server function to drop the weapon, preserving the magazine bullets if it's a firearm
+        DropWeapon_Server(WeaponToDrop, WeaponToDrop->IsA<AFNRFireWeapon>() ? Cast<AFNRFireWeapon>(WeaponToDrop)->BulletsInMag : 0, bSimulatePhysics);
+
+        // Broadcast the event to notify weapon unequip
+        OnEquipOrUnEquipWeapon.Broadcast(nullptr);
+    }
 }
 
 void UFNRWeaponComponent::DropCurrentWeapon(const bool bSimulatePhysics)
 {
-	if (bHasMontageRunning) return;
-	if (EquippedFireWeapon)
-	{
-		EquippedFireWeapon->GetWorldTimerManager().ClearTimer(EquippedFireWeapon->ReloadTimerHandle);
-		EquippedFireWeapon->GetWorldTimerManager().ClearTimer(EquippedFireWeapon->FireWithDelayTimerHandle);
-		DropWeapon_Server(EquippedFireWeapon, EquippedFireWeapon->BulletsInMag, bSimulatePhysics);
-		OnEquipOrUnEquipWeapon.Broadcast(nullptr);
-		return;
-	}
-	if (EquippedGrenade)
-	{
-		FinishSpawnGrenade(true);
-	}
-	else if (EquippedMeleeWeapon && !EquippedMeleeWeapon->bAllowChangeWeapon) {return;}
-	DropWeapon_Server(EquippedWeapon, 0, bSimulatePhysics);
-	OnEquipOrUnEquipWeapon.Broadcast(nullptr);
+    // Prevent dropping while an animation montage is running
+    if (bHasMontageRunning) return;
+
+    // Handle firearm weapon drop
+    if (EquippedFireWeapon)
+    {
+        // Clear any active timers for firing or reloading
+        EquippedFireWeapon->GetWorldTimerManager().ClearTimer(EquippedFireWeapon->ReloadTimerHandle);
+        EquippedFireWeapon->GetWorldTimerManager().ClearTimer(EquippedFireWeapon->FireWithDelayTimerHandle);
+
+        // Call the server to drop the firearm with its current magazine bullets
+        DropWeapon_Server(EquippedFireWeapon, EquippedFireWeapon->BulletsInMag, bSimulatePhysics);
+        OnEquipOrUnEquipWeapon.Broadcast(nullptr);
+        return;
+    }
+
+    // Handle grenade drop
+    if (EquippedGrenade)
+    {
+        FinishSpawnGrenade(true);
+    }
+    // Prevent melee weapon drop if the weapon does not allow switching
+    else if (EquippedMeleeWeapon && !EquippedMeleeWeapon->bAllowChangeWeapon) 
+    {
+        return;
+    }
+
+    // Drop the currently equipped weapon (non-firearm) without bullets
+    DropWeapon_Server(EquippedWeapon, 0, bSimulatePhysics);
+    OnEquipOrUnEquipWeapon.Broadcast(nullptr);
 }
 
 void UFNRWeaponComponent::DropAllWeapons(const bool bIncludeGrenades, const bool bSimulatePhysics)
 {
-	if (Weapons.Num() <= 0) return;
+    // Return if there are no weapons to drop
+    if (Weapons.Num() <= 0) return;
 
-	for (int i = 0; i < Weapons.Num() - 1; ++i)
-	{		
-		const auto& LocallyWeapon = Weapons[i];
-		if (!IsValid(LocallyWeapon))
-		{
-			continue;
-		}
-		const auto& LocallyGrenade = Cast<AFNRGrenade>(LocallyWeapon);
-		if (!bIncludeGrenades && IsValid(LocallyGrenade))
-		{
-			continue;
-		}
-		DropWeapon(LocallyWeapon, bSimulatePhysics);
-		OnEquipOrUnEquipWeapon.Broadcast(nullptr);
-	}
+    // Iterate through the weapon list and drop each valid weapon
+    for (int i = 0; i < Weapons.Num() - 1; ++i)
+    {        
+        const auto& LocallyWeapon = Weapons[i];
+
+        // Skip invalid weapons
+        if (!IsValid(LocallyWeapon))
+        {
+            continue;
+        }
+
+        // Check if the weapon is a grenade and should be skipped based on the parameter
+        const auto& LocallyGrenade = Cast<AFNRGrenade>(LocallyWeapon);
+        if (!bIncludeGrenades && IsValid(LocallyGrenade))
+        {
+            continue;
+        }
+
+        // Drop the weapon and broadcast the event
+        DropWeapon(LocallyWeapon, bSimulatePhysics);
+        OnEquipOrUnEquipWeapon.Broadcast(nullptr);
+    }
 }
 
 void UFNRWeaponComponent::LockCameraInTarget(const bool bLocked)
 {
-	if (EquippedMeleeWeapon)
-	{
-		LockedInEnemy = bLocked;
-	}
+    // Lock camera on the enemy if a melee weapon is equipped
+    if (EquippedMeleeWeapon)
+    {
+        LockedInEnemy = bLocked;
+    }
 }
 
 void UFNRWeaponComponent::NextFireMode() const
 {
-	if (!IsValid(EquippedFireWeapon) || !IsValid(ComponentOwnerCharacter))
-	{
-		return;
-	}
+    // Ensure both the weapon and character are valid
+    if (!IsValid(EquippedFireWeapon) || !IsValid(ComponentOwnerCharacter))
+    {
+        return;
+    }
 
-	
-	if (!EquippedFireWeapon || !ComponentOwnerCharacter) return;
+    // Array to store available fire modes for the weapon
+    TArray<EFireMode_PRAS> AvailableFireModes;
+    
+    // Add possible fire modes based on weapon tags
+    if (EquippedFireWeapon->Internal_FireWeaponData.PossibleFireModes.HasTag(FscFireModeTags::CanAuto)) 
+        AvailableFireModes.Add(Auto);
+    if (EquippedFireWeapon->Internal_FireWeaponData.PossibleFireModes.HasTag(FscFireModeTags::CanBurst)) 
+        AvailableFireModes.Add(Burst);
+    if (EquippedFireWeapon->Internal_FireWeaponData.PossibleFireModes.HasTag(FscFireModeTags::CanSingle)) 
+        AvailableFireModes.Add(Semi);
 
-	TArray<EFireMode_PRAS> AvailableFireModes;
-	
-	if (EquippedFireWeapon->Internal_FireWeaponData.PossibleFireModes.HasTag(FscFireModeTags::CanAuto)) AvailableFireModes.Add(Auto);
-	if (EquippedFireWeapon->Internal_FireWeaponData.PossibleFireModes.HasTag(FscFireModeTags::CanBurst)) AvailableFireModes.Add(Burst);
-	if (EquippedFireWeapon->Internal_FireWeaponData.PossibleFireModes.HasTag(FscFireModeTags::CanSingle)) AvailableFireModes.Add(Semi);
+    // Get the current fire mode index in the array
+    const int CurrentIndex = AvailableFireModes.IndexOfByKey(EquippedFireWeapon->CurrentFireMode);
+    if (CurrentIndex == INDEX_NONE) return;
 
-	int CurrentIndex = AvailableFireModes.IndexOfByKey(EquippedFireWeapon->CurrentFireMode);
-	if (CurrentIndex == INDEX_NONE) return;
+    // Cycle to the next fire mode
+    const int NextIndex = (CurrentIndex + 1) % AvailableFireModes.Num();
+    EquippedFireWeapon->SetFireMode(AvailableFireModes[NextIndex]);
 
-	int NextIndex = (CurrentIndex + 1) % AvailableFireModes.Num();
-	EquippedFireWeapon->SetFireMode(AvailableFireModes[NextIndex]);
-	OnChangeFireMode.Broadcast(AvailableFireModes[NextIndex]);
+    // Notify listeners about the fire mode change
+    OnChangeFireMode.Broadcast(AvailableFireModes[NextIndex]);
 }
 
 void UFNRWeaponComponent::Fire(const bool bFire)
@@ -563,28 +574,11 @@ void UFNRWeaponComponent::Fire(const bool bFire)
 				if (!bHasMontageRunning && EquippedWeapon->Fire(true))
 				{
 					GetWeaponComponentInterface()->OnCharacterToggleWeaponFire(true);
-					
-					if (EquippedWeapon->HasAmmo())
-					{			
-						bIsInterpolatingRecoil = false;
-
-						const AController* Controller = ComponentOwnerCharacter->GetController();
-						if (Controller)
-						{
-							OriginalPitch = Controller->GetControlRotation().Pitch;
-						}
-					}
-					else
-					{
-						ResetRecoil();
-					}
 				}
 			}
 			else
 			{
 				EquippedWeapon->Fire(false);
-				
-				ResetRecoil();
 
 				GetWeaponComponentInterface()->OnCharacterToggleWeaponFire(false);
 			}
@@ -620,28 +614,11 @@ void UFNRWeaponComponent::AIFire(const bool bFire, const FVector TargetLocation,
 				if (!bHasMontageRunning && EquippedWeapon->AIFire(true, TargetLocation, Precision))
 				{
 					GetWeaponComponentInterface()->OnCharacterToggleWeaponFire(true);
-					
-					if (EquippedWeapon->HasAmmo())
-					{			
-						bIsInterpolatingRecoil = false;
-
-						const AController* Controller = ComponentOwnerCharacter->GetController();
-						if (Controller)
-						{
-							OriginalPitch = Controller->GetControlRotation().Pitch;
-						}
-					}
-					else
-					{
-						ResetRecoil();
-					}
 				}
 			}
 			else
 			{
 				EquippedWeapon->AIFire(false, TargetLocation, Precision);
-				
-				ResetRecoil();
 
 				GetWeaponComponentInterface()->OnCharacterToggleWeaponFire(false);
 			}
@@ -814,38 +791,60 @@ void UFNRWeaponComponent::ReloadByAnim(const int Quantity) const
 
 void UFNRWeaponComponent::InspectWeapon(const bool bInspect)
 {
-	if (!IsValid(ComponentOwnerPlayerController))
-	{
-		ComponentOwnerPlayerController = Cast<APlayerController>(ComponentOwnerCharacter->GetController());
-	}
-	
-	if (!IsValid(ComponentOwnerPlayerController) || !IsValid(EquippedFireWeapon)) return;
-	if (bInspect)
-	{
-		ComponentOwnerPlayerController->bShowMouseCursor = true;
-		UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(ComponentOwnerPlayerController, nullptr, EMouseLockMode::LockInFullscreen, false, true);
-		bIsInspecting = true;
-		if (AttachmentsWidget)
-		{
-			AttachmentsWidget->RemoveFromParent();
-		}
-		Fire(false);
-		AttachmentsWidget = CreateWidget<UFNRAttachmentSwitch>(ComponentOwnerPlayerController, AvailableAttachmentsWidgetClass);
-		AttachmentsWidget->UpdateInfo(this, EAttachmentType::Other);
-		AttachmentsWidget->AddToViewport();
-		ComponentOwnerPlayerController->bShowMouseCursor = true;
-	}
-	else
-	{
-		bIsInspecting = false;
-		ComponentOwnerPlayerController->bShowMouseCursor = false;
-		UWidgetBlueprintLibrary::SetInputMode_GameOnly(ComponentOwnerPlayerController);
-		if (AttachmentsWidget)
-		{
-			AttachmentsWidget->RemoveFromParent();
-		}
-	}
-	OnInspect.Broadcast(bIsInspecting);
+    // Check if the player controller is valid, if not, get it from the character's controller
+    if (!IsValid(ComponentOwnerPlayerController))
+    {
+        ComponentOwnerPlayerController = Cast<APlayerController>(ComponentOwnerCharacter->GetController());
+    }
+
+    // Ensure both the player controller and equipped fire weapon are valid
+    if (!IsValid(ComponentOwnerPlayerController) || !IsValid(EquippedFireWeapon)) return;
+
+    // If the inspect flag is true, start inspecting the weapon
+    if (bInspect)
+    {
+        // Enable mouse cursor and set input mode for UI interaction
+        ComponentOwnerPlayerController->bShowMouseCursor = true;
+        UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(ComponentOwnerPlayerController, nullptr, EMouseLockMode::LockInFullscreen, false, true);
+        
+        // Set the inspecting state to true
+        bIsInspecting = true;
+
+        // Remove any existing attachments widget before creating a new one
+        if (AttachmentsWidget)
+        {
+            AttachmentsWidget->RemoveFromParent();
+        }
+
+        // Disable firing while inspecting the weapon
+        Fire(false);
+
+        // Create and display the attachments widget
+        AttachmentsWidget = CreateWidget<UFNRAttachmentSwitch>(ComponentOwnerPlayerController, AvailableAttachmentsWidgetClass);
+        AttachmentsWidget->UpdateInfo(this, EAttachmentType::Other);
+        AttachmentsWidget->AddToViewport();
+
+        // Keep the mouse cursor visible during the inspection
+        ComponentOwnerPlayerController->bShowMouseCursor = true;
+    }
+    else
+    {
+        // Stop inspecting the weapon
+        bIsInspecting = false;
+
+        // Hide the mouse cursor and return to game input mode
+        ComponentOwnerPlayerController->bShowMouseCursor = false;
+        UWidgetBlueprintLibrary::SetInputMode_GameOnly(ComponentOwnerPlayerController);
+
+        // Remove the attachments widget if it's still present
+        if (AttachmentsWidget)
+        {
+            AttachmentsWidget->RemoveFromParent();
+        }
+    }
+
+    // Broadcast the inspection state change
+    OnInspect.Broadcast(bIsInspecting);
 }
 
 void UFNRWeaponComponent::AttachWeapon(AFNRWeapon* Weapon, const bool bHolster)

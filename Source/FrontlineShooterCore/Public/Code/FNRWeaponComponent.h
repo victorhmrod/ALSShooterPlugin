@@ -103,9 +103,6 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Weapons|Recoil")
 	float RecoilInterpSpeed{65.0f};
 
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "Weapons|Recoil")
-	float LastRecoilApplied{0.0f};
-
 protected:
 	UPROPERTY(EditAnywhere, Replicated, Category = "Weapons|Ammo")
 	int LightAmmo = 60;
@@ -136,8 +133,6 @@ public:
 	bool bHasMontageRunning = false;
 	
 private:
-	bool bIsInterpolatingRecoil = false;
-
 	int WeaponToEquipIndex = -1;
 	
 	UPROPERTY(Replicated)
@@ -151,9 +146,6 @@ private:
 	UFNRAttachmentSwitch* AttachmentsWidget;
 
 	FTimerHandle GrenadeTimerHandle, DetectEnemyTimerHandle;
-
-public:
-	float OriginalPitch{};
 
 	#pragma region Combat System
 private:
@@ -211,8 +203,6 @@ protected:
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
-	void ResetRecoilRefresh(float DeltaTime);
-
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	
 #pragma endregion Unreal Defaults
@@ -247,9 +237,6 @@ private:
 	void SetFocusEnemy(AActor* NewFocusedEnemy);
 	
 	void UpdateDetectedEnemies();
-
-public:
-	void ResetRecoil();
 	
 #pragma endregion CPP Only
 

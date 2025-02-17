@@ -45,7 +45,7 @@ public:
 	virtual void OnRep_bIsFiring();
 	
 	UPROPERTY(BlueprintReadOnly, Category = "References", Replicated)
-	class AFNRPlayerCharacter* CharacterOwner = nullptr;
+	TObjectPtr<class AFNRPlayerCharacter> CharacterOwner = nullptr;
 
 	UPROPERTY(BlueprintReadOnly, Category = "References", Replicated)
 	class UFNRWeaponComponent* WeaponSystem = nullptr;
