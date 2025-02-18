@@ -362,7 +362,7 @@ struct FFireWeaponData : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Behavior")
 	FName MagazineEjectSocket{"EjectPoint"};
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Behavior")
-	FName AimingCameraSocket{"CameraOffsetSocket"};
+	FName AimingCameraSocket{"ADSCamera"};
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Bow|Behavior")
 	float MaxVelocitySpeed = 2500.0f;
 };

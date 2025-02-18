@@ -208,7 +208,7 @@ public:
 
 // Socket for aiming camera
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attachments", Meta = (Tooltip = "Socket for aiming camera"))
-	FName AimingCameraSocket{"CameraOffsetSocket"};
+	FName AimingCameraSocket{"ADSCamera"};
 	
 	// Convert weapon data asset into structured weapon data for use in-game
 	static FFireWeaponData AsStructure(const UFNRFireWeaponData* WeaponDataAsset)
