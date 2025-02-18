@@ -100,8 +100,6 @@ public:
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
-	
-	virtual void ReadValues();
 
 	virtual void PreInitializeComponents() override;
 
@@ -110,8 +108,6 @@ protected:
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
-
-	virtual TArray<class UMeshComponent*> GetGlowableMeshes() const;
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
@@ -126,7 +122,11 @@ public:
 	UFUNCTION()
 	virtual void RefreshCPPOnly();
 	
-	#pragma endregion CPP Only
+	virtual TArray<class UMeshComponent*> GetGlowableMeshes() const;
+	
+	virtual void ReadValues();
+
+#pragma endregion CPP Only
 	
 	#pragma region Binded Functions
 protected:

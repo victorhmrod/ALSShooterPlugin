@@ -3,13 +3,13 @@
 #include "Code/FNRAttachment.h"
 
 #include "FrontlineShooterCore.h"
-#include "Code/FNRAttachmentWeaponComponent.h"
+#include "Code/FNRAttachmentComponent.h"
 #include "Code/FNRFireWeapon.h"
 #include "Code/FNRWeaponComponent.h"
 #include "Core/InteractableComponent.h"
 #include "Core/InteractorComponent.h"
 #include "Core/FNRInventoryComponent.h"
-#include "Data/FNRAttachmentData.h"
+#include "Data/FNRAttachmentDataAsset.h"
 #include "Logging/StructuredLog.h"
 
 AFNRAttachment::AFNRAttachment()
@@ -29,7 +29,7 @@ void AFNRAttachment::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (!IsValid(Attachment))
+	if (!IsValid(AttachmentDataAsset))
 	{
 		UKismetSystemLibrary::PrintString(this, 
 			"Você esqueceu de colocar o Data Asset", 
@@ -37,11 +37,15 @@ void AFNRAttachment::BeginPlay()
 		return;
 	}
 
-	UStaticMesh* LoadedMesh = Attachment->Mesh.LoadSynchronous();
-	if (IsValid(LoadedMesh))
+	UStaticMesh* LoadedMesh = AttachmentDataAsset->Mesh.LoadSynchronous();
+	if (LoadedMesh)
 	{
 		AttachmentMesh->SetStaticMesh(LoadedMesh);
 	}
+
+	InteractableComponent->SetDisplayText(AttachmentDataAsset->Name.ToString());
+
+	InteractableComponent->SetTooltipText(AttachmentDataAsset->Tooltip.ToString());
 
 	AttachmentMesh->SetSimulatePhysics(true);
 }
@@ -87,7 +91,7 @@ void AFNRAttachment::Server_TryAddAttachment_Implementation(const AActor* Charac
 	}
 	else if (InventoryComponent)
 	{
-		ItemAddResult = InventoryComponent->TryAddItemFromClass(Attachment->ItemClass, 1);
+		ItemAddResult = InventoryComponent->TryAddItemFromClass(AttachmentDataAsset->ItemClass, 1);
 		if (ItemAddResult.Result != EItemAddResult::IAR_NoItemsAdded)
 		{
 			Destroy(true);
@@ -104,7 +108,7 @@ void AFNRAttachment::Server_TryAddAttachment_Implementation(const AActor* Charac
 
 bool AFNRAttachment::TryAddAttachment(const AActor* Character)
 {
-	if (!IsValid(Attachment) || !Character)
+	if (!IsValid(AttachmentDataAsset) || !Character)
 	{
 		UE_LOGFMT(LogFSC, Warning, "Attachment Data Asset or Character is invalid");
 		return false;

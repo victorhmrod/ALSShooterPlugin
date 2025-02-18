@@ -4,18 +4,18 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "FNRAttachmentWeaponComponent.generated.h"
+#include "FNRAttachmentComponent.generated.h"
 
 enum class EAttachmentType : uint8;
 class AFNRAttachment;
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
-class FRONTLINESHOOTERCORE_API UFNRAttachmentWeaponComponent : public UActorComponent
+class FRONTLINESHOOTERCORE_API UFNRAttachmentComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
 public:
-	UFNRAttachmentWeaponComponent();
+	UFNRAttachmentComponent();
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	
 protected:

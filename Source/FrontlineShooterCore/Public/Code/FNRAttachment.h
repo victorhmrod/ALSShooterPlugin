@@ -26,7 +26,7 @@ public:
 #pragma region Variables
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Info")
-	TObjectPtr<class UFNRAttachmentData> Attachment;
+	TObjectPtr<class UFNRAttachmentDataAsset> AttachmentDataAsset;
 	
 	//Variable that handles and stores the result of the operation to add item to the inventory.
 	UPROPERTY(BlueprintReadOnly, Category="Info|Inventory")

@@ -5,7 +5,7 @@
 
 #include "NiagaraComponent.h"
 #include "Code/FNRAttachment.h"
-#include "Code/FNRAttachmentWeaponComponent.h"
+#include "Code/FNRAttachmentComponent.h"
 #include "Code/FNRFireWeapon.h"
 #include "Components/PrimitiveComponent.h"
 #include "GameFramework/Pawn.h"
@@ -95,19 +95,19 @@ void AFNRWeapon::ReadValues()
 		LoadedFireCharacterMontage = GetGeneralData().CharacterFireMontage.Get();
 	}
 
-	if (IsValid(GetGeneralData().WeaponEquipAnim.LoadSynchronous()))
+	if (IsValid(GetGeneralData().WeaponEquipAnimation.LoadSynchronous()))
 	{
-		LoadedWeaponEquipAnim = GetGeneralData().WeaponEquipAnim.Get();
+		LoadedWeaponEquipAnim = GetGeneralData().WeaponEquipAnimation.Get();
 	}
 
-	if (IsValid(GetGeneralData().WeaponUnEquipAnim.LoadSynchronous()))
+	if (IsValid(GetGeneralData().WeaponUnEquipAnimation.LoadSynchronous()))
 	{
-		LoadedWeaponUnEquipAnim = GetGeneralData().WeaponUnEquipAnim.Get();
+		LoadedWeaponUnEquipAnim = GetGeneralData().WeaponUnEquipAnimation.Get();
 	}
 
-	if (IsValid(GetGeneralData().WeaponFireAnim.LoadSynchronous()))
+	if (IsValid(GetGeneralData().WeaponFireAnimations.LoadSynchronous()))
 	{
-		LoadedWeaponFireAnim = GetGeneralData().WeaponFireAnim.Get();
+		LoadedWeaponFireAnim = GetGeneralData().WeaponFireAnimations.Get();
 	}
 }
 
@@ -150,27 +150,27 @@ void AFNRWeapon::RefreshGlow_Implementation() const
 	}
 
 	FLinearColor ColorToSet;
-	if (GetGeneralData().RarityMode == FscRarityType::Commom)
+	if (GetGeneralData().Rarity == FscRarityType::Commom)
 	{
 		ColorToSet = RarityColors.Common;
 	}
-	else if (GetGeneralData().RarityMode == FscRarityType::Uncommom)
+	else if (GetGeneralData().Rarity == FscRarityType::Uncommom)
 	{
 		ColorToSet = RarityColors.Uncommon;
 	}
-	else if (GetGeneralData().RarityMode == FscRarityType::Rare)
+	else if (GetGeneralData().Rarity == FscRarityType::Rare)
 	{
 		ColorToSet = RarityColors.Rare;
 	}
-	else if (GetGeneralData().RarityMode == FscRarityType::UltraRare)
+	else if (GetGeneralData().Rarity == FscRarityType::UltraRare)
 	{
 		ColorToSet = RarityColors.UltraRare;
 	}
-	else if (GetGeneralData().RarityMode == FscRarityType::Divine)
+	else if (GetGeneralData().Rarity == FscRarityType::Divine)
 	{
 		ColorToSet = RarityColors.Divine;
 	}
-	else if (GetGeneralData().RarityMode == FscRarityType::Mythic)
+	else if (GetGeneralData().Rarity == FscRarityType::Mythic)
 	{
 		ColorToSet = RarityColors.Mythic;
 	}
@@ -212,7 +212,7 @@ void AFNRWeapon::SetFade(const bool bHolster)
 	GetWorldTimerManager().ClearTimer(FadeTimerHandle);
 	
 	const float TargetValue = bHolster ? 1.0f : 0.0f;
-	const float InterpVelocity = bHolster ? GetGeneralData().HolsterFadeVelocity : GetGeneralData().EquipFadeVelocity;
+	const float InterpVelocity = bHolster ? GetGeneralData().HolsterFadeSpeed : GetGeneralData().EquipFadeSpeed;
 	
 	GetWorldTimerManager().SetTimer(FadeTimerHandle, [this, TargetValue, InterpVelocity]
 	{

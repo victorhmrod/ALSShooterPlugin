@@ -1,18 +1,18 @@
 //  Wise Labs: Gameworks (c) 2020-2024
 
-#include "Code/FNRAttachmentWeaponComponent.h"
+#include "Code/FNRAttachmentComponent.h"
 
 #include "FrontlineShooterCore.h"
 #include "Code/FNRAttachment.h"
 #include "Code/FNRFireWeapon.h"
 #include "Core/FNRInventoryComponent.h"
 #include "Core/InteractableComponent.h"
-#include "Data/FNRAttachmentData.h"
+#include "Data/FNRAttachmentDataAsset.h"
 #include "Data/FSCTypes.h"
 #include "Kismet/GameplayStatics.h"
 #include "Logging/StructuredLog.h"
 
-UFNRAttachmentWeaponComponent::UFNRAttachmentWeaponComponent()
+UFNRAttachmentComponent::UFNRAttachmentComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
 	SetIsReplicatedByDefault(true);
@@ -27,14 +27,13 @@ UFNRAttachmentWeaponComponent::UFNRAttachmentWeaponComponent()
 	CompatibleAttachments.Add(EAttachmentType::Stock);
 }
 
-void UFNRAttachmentWeaponComponent::BeginPlay()
+void UFNRAttachmentComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
 	Weapon = Cast<AFNRFireWeapon>(GetOwner());
 	if (!IsValid(Weapon))
 	{
-		
 		UE_LOGFMT(LogFSC, Error, "Weapon is invalid");
 		GetWorld()->GetTimerManager().SetTimer(ReassignAddAttachmentHandle, [this]
 		{
@@ -51,12 +50,12 @@ void UFNRAttachmentWeaponComponent::BeginPlay()
 	}
 }
 
-void UFNRAttachmentWeaponComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+void UFNRAttachmentComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 }
 
-void UFNRAttachmentWeaponComponent::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
+void UFNRAttachmentComponent::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
@@ -64,13 +63,13 @@ void UFNRAttachmentWeaponComponent::GetLifetimeReplicatedProps(TArray<class FLif
 	DOREPLIFETIME(ThisClass, Weapon);
 }
 
-AFNRAttachment* UFNRAttachmentWeaponComponent::GetAttachmentByType(const EAttachmentType& AttachmentType) const
+AFNRAttachment* UFNRAttachmentComponent::GetAttachmentByType(const EAttachmentType& AttachmentType) const
 {
 	if (CurrentAttachments.Num() > 0)
 	{
 		for (const auto& a : CurrentAttachments)
 		{
-			if (a && a->Attachment->AttachmentType == AttachmentType)
+			if (a && a->AttachmentDataAsset->AttachmentType == AttachmentType)
 			{
 				return a;
 			}
@@ -79,17 +78,17 @@ AFNRAttachment* UFNRAttachmentWeaponComponent::GetAttachmentByType(const EAttach
 	return nullptr;
 }
 
-TArray<AFNRAttachment*> UFNRAttachmentWeaponComponent::GetAttachments() const
+TArray<AFNRAttachment*> UFNRAttachmentComponent::GetAttachments() const
 {
 	return CurrentAttachments;
 }
 
-bool UFNRAttachmentWeaponComponent::WeaponContainsAttachment(AFNRAttachment* Attachment) const
+bool UFNRAttachmentComponent::WeaponContainsAttachment(AFNRAttachment* Attachment) const
 {
 	return Attachment ? CurrentAttachments.Contains(Attachment) : false;
 }
 
-bool UFNRAttachmentWeaponComponent::WeaponContainsAttachmentByClass(const TSubclassOf<AFNRAttachment> Attachment) const
+bool UFNRAttachmentComponent::WeaponContainsAttachmentByClass(const TSubclassOf<AFNRAttachment> Attachment) const
 {
 	if (Attachment)
 	{
@@ -104,7 +103,7 @@ bool UFNRAttachmentWeaponComponent::WeaponContainsAttachmentByClass(const TSubcl
 	return false;
 }
 
-bool UFNRAttachmentWeaponComponent::AddAttachment(const TSubclassOf<AFNRAttachment> AttachmentToAdd,
+bool UFNRAttachmentComponent::AddAttachment(const TSubclassOf<AFNRAttachment> AttachmentToAdd,
 	const bool bRemoveFromInventory)
 {
 	if (!IsValid(Weapon))
@@ -135,16 +134,16 @@ bool UFNRAttachmentWeaponComponent::AddAttachment(const TSubclassOf<AFNRAttachme
 		UE_LOGFMT(LogFSC, Error, "'AttachmentToAdd' is an invalid class");
 		return false;
 	}
-	if (!CompatibleAttachments.Contains(Attachment->Attachment->AttachmentType))
+	if (!CompatibleAttachments.Contains(Attachment->AttachmentDataAsset->AttachmentType))
 	{
 		UE_LOGFMT(LogFSC, Warning, "'AttachmentToAdd' isn't compatible with weapon type");
 		return false;
 	}
-	switch (Attachment->Attachment->CompatibilityMode)
+	switch (Attachment->AttachmentDataAsset->CompatibilityMode)
 	{
 	case EC_ByWeaponName:
 		{
-			if (Attachment->Attachment->CompatibleWeaponName == Weapon->GetGeneralData().WeaponName)
+			if (Attachment->AttachmentDataAsset->CompatibleWeaponName == Weapon->GetGeneralData().WeaponName)
 			{
 				Internal_AddAttachment(Attachment, AttachmentToAdd, bRemoveFromInventory);
 				return true;
@@ -154,7 +153,7 @@ bool UFNRAttachmentWeaponComponent::AddAttachment(const TSubclassOf<AFNRAttachme
 		}
 	default: case EC_ByAmmoMode:
 		{
-			if (Attachment->Attachment->CompatibleWeaponAmmoModes.Contains(Weapon->Internal_FireWeaponData.AmmoMode))
+			if (Attachment->AttachmentDataAsset->CompatibleWeaponAmmoModes.Contains(Weapon->Internal_FireWeaponData.AmmoMode))
 			{
 				Internal_AddAttachment(Attachment, AttachmentToAdd, bRemoveFromInventory);
 				return true;
@@ -163,14 +162,14 @@ bool UFNRAttachmentWeaponComponent::AddAttachment(const TSubclassOf<AFNRAttachme
 			break;
 		}
 	}
-	if (const AFNRAttachment* AttachmentSpawned = GetAttachmentByType(Attachment->Attachment->AttachmentType))
+	if (const AFNRAttachment* AttachmentSpawned = GetAttachmentByType(Attachment->AttachmentDataAsset->AttachmentType))
 	{
 		UE_LOGFMT(LogFSC, Warning, "{0} is{1} simulating physics", AttachmentSpawned->GetName(), AttachmentSpawned->AttachmentMesh->IsAnySimulatingPhysics() ? "" : "n't");
 	}
 	return false;
 }
 
-void UFNRAttachmentWeaponComponent::Internal_AddAttachment(AFNRAttachment* Attachment, const TSubclassOf<AFNRAttachment>& AttachmentToAdd, const bool bRemoveFromInventory)
+void UFNRAttachmentComponent::Internal_AddAttachment(AFNRAttachment* Attachment, const TSubclassOf<AFNRAttachment>& AttachmentToAdd, const bool bRemoveFromInventory)
 {
 	AddAttachment_Server(AttachmentToAdd, bRemoveFromInventory);
 	Attachment->AttachmentMesh->SetSimulatePhysics(false);
@@ -179,11 +178,11 @@ void UFNRAttachmentWeaponComponent::Internal_AddAttachment(AFNRAttachment* Attac
 	//Attachment->AttachToComponent(MeshComponent, FAttachmentTransformRules::SnapToTargetIncludingScale, Attachment->Attachment->WeaponSocketToAttach);
 	if (IsValid(Weapon->CharacterOwner) && Weapon->CharacterOwner->IsLocallyControlled())
 	{
-		UGameplayStatics::PlaySound2D(this, AttachmentToAdd.GetDefaultObject()->Attachment->EquipSound.LoadSynchronous());
+		UGameplayStatics::PlaySound2D(this, AttachmentToAdd.GetDefaultObject()->AttachmentDataAsset->EquipSound.LoadSynchronous());
 	}
 }
 
-bool UFNRAttachmentWeaponComponent::RemoveAttachment(AFNRAttachment* AttachmentToRemove, const bool bDropOnRemove)
+bool UFNRAttachmentComponent::RemoveAttachment(AFNRAttachment* AttachmentToRemove, const bool bDropOnRemove)
 {
 	if (AttachmentToRemove && CurrentAttachments.Contains(AttachmentToRemove))
 	{
@@ -195,7 +194,7 @@ bool UFNRAttachmentWeaponComponent::RemoveAttachment(AFNRAttachment* AttachmentT
 	return false;
 }
 
-bool UFNRAttachmentWeaponComponent::RemoveAttachmentByClass(const TSubclassOf<AFNRAttachment> AttachmentToRemove,
+bool UFNRAttachmentComponent::RemoveAttachmentByClass(const TSubclassOf<AFNRAttachment> AttachmentToRemove,
 	const bool bDropOnRemove)
 {
 	if (IsValid(AttachmentToRemove))
@@ -223,7 +222,7 @@ bool UFNRAttachmentWeaponComponent::RemoveAttachmentByClass(const TSubclassOf<AF
 	return false;
 }
 
-void UFNRAttachmentWeaponComponent::UpdateAttachment(const TSubclassOf<AFNRAttachment> AttachmentClass,
+void UFNRAttachmentComponent::UpdateAttachment(const TSubclassOf<AFNRAttachment> AttachmentClass,
 	const bool bForceRemoveAttachment, const bool bDropInsteadRemove)
 {
 	if (IsValid(AttachmentClass))
@@ -258,13 +257,13 @@ void UFNRAttachmentWeaponComponent::UpdateAttachment(const TSubclassOf<AFNRAttac
 	UE_LOGFMT(LogFSC, Error, "Attachment class is invalid");
 }
 
-void UFNRAttachmentWeaponComponent::DropAttachment_Implementation(TSubclassOf<AFNRAttachment> AttachmentToRemove,
+void UFNRAttachmentComponent::DropAttachment_Implementation(TSubclassOf<AFNRAttachment> AttachmentToRemove,
                                                                   const FTransform& Transform)
 {
 	UFNRInventoryComponent* Inventory = Weapon->CharacterOwner->GetComponentByClass<UFNRInventoryComponent>();
-	if (Inventory && !Inventory->FindItemsByClass(AttachmentToRemove->GetDefaultObject<AFNRAttachment>()->Attachment->ItemClass).IsEmpty())
+	if (Inventory && !Inventory->FindItemsByClass(AttachmentToRemove->GetDefaultObject<AFNRAttachment>()->AttachmentDataAsset->ItemClass).IsEmpty())
 	{
-		UFNRInventoryItem* ItemToRemove = Inventory->FindItemsByClass(AttachmentToRemove->GetDefaultObject<AFNRAttachment>()->Attachment->ItemClass)[0];
+		UFNRInventoryItem* ItemToRemove = Inventory->FindItemsByClass(AttachmentToRemove->GetDefaultObject<AFNRAttachment>()->AttachmentDataAsset->ItemClass)[0];
 		if (ItemToRemove)
 		{
 			Inventory->RemoveItem(ItemToRemove);
@@ -276,11 +275,11 @@ void UFNRAttachmentWeaponComponent::DropAttachment_Implementation(TSubclassOf<AF
 		AttachmentSpawned->AttachmentMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 		AttachmentSpawned->AttachmentMesh->SetSimulatePhysics(true);
 		UGameplayStatics::FinishSpawningActor(AttachmentSpawned, Transform);
-		AttachmentSpawned->AttachmentMesh->AddRadialImpulse(Weapon->MeshComponent->GetSocketLocation(AttachmentSpawned->Attachment->WeaponSocketToAttach), 32.0f, 50.0f, RIF_Linear);
+		AttachmentSpawned->AttachmentMesh->AddRadialImpulse(Weapon->MeshComponent->GetSocketLocation(AttachmentSpawned->AttachmentDataAsset->WeaponSocketToAttach), 32.0f, 50.0f, RIF_Linear);
 	}
 }
 
-void UFNRAttachmentWeaponComponent::RemoveAttachment_Server_Implementation(AFNRAttachment* AttachmentToRemove,
+void UFNRAttachmentComponent::RemoveAttachment_Server_Implementation(AFNRAttachment* AttachmentToRemove,
                                                                            bool bDropOnRemove)
 {
 	CurrentAttachments.Remove(AttachmentToRemove);
@@ -288,7 +287,7 @@ void UFNRAttachmentWeaponComponent::RemoveAttachment_Server_Implementation(AFNRA
 	{
 		if (Weapon->CharacterOwner->IsLocallyControlled())
 		{
-			UGameplayStatics::PlaySound2D(this, AttachmentToRemove->Attachment->UnequipSound.LoadSynchronous());
+			UGameplayStatics::PlaySound2D(this, AttachmentToRemove->AttachmentDataAsset->UnequipSound.LoadSynchronous());
 		}
 		DropAttachment(AttachmentToRemove->GetClass(), AttachmentToRemove->GetActorTransform());
 		AttachmentToRemove->Destroy();
@@ -299,10 +298,10 @@ void UFNRAttachmentWeaponComponent::RemoveAttachment_Server_Implementation(AFNRA
 	{
 		if (Weapon->CharacterOwner->IsLocallyControlled())
 		{
-			UGameplayStatics::PlaySound2D(this, AttachmentToRemove->Attachment->UnequipSound.LoadSynchronous());
+			UGameplayStatics::PlaySound2D(this, AttachmentToRemove->AttachmentDataAsset->UnequipSound.LoadSynchronous());
 		}
 		UE_LOGFMT(LogFSC, Display, "Attachment added to player inventory with success");
-		Inventory->TryAddItemFromClass(AttachmentToRemove->Attachment->ItemClass);
+		Inventory->TryAddItemFromClass(AttachmentToRemove->AttachmentDataAsset->ItemClass);
 		AttachmentToRemove->Destroy();
 	}
 	else
@@ -311,7 +310,7 @@ void UFNRAttachmentWeaponComponent::RemoveAttachment_Server_Implementation(AFNRA
 	}
 }
 
-void UFNRAttachmentWeaponComponent::AddAttachment_Server_Implementation(TSubclassOf<AFNRAttachment> AttachmentToAdd,
+void UFNRAttachmentComponent::AddAttachment_Server_Implementation(TSubclassOf<AFNRAttachment> AttachmentToAdd,
                                                                         bool bRemoveFromInventory)
 {
 	if (!IsValid(Weapon->CharacterOwner))
@@ -327,17 +326,17 @@ void UFNRAttachmentWeaponComponent::AddAttachment_Server_Implementation(TSubclas
 		UE_LOGFMT(LogFSC, Error, "AttachmentToAdd is not valid");
 		return;
 	}
-	if (AFNRAttachment* ExistentAttachment = GetAttachmentByType(AttachmentSpawned->Attachment->AttachmentType))
+	if (AFNRAttachment* ExistentAttachment = GetAttachmentByType(AttachmentSpawned->AttachmentDataAsset->AttachmentType))
 	{
 		if (UFNRInventoryComponent* Inventory = Weapon->CharacterOwner->GetComponentByClass<UFNRInventoryComponent>())
 		{
-			if (Inventory->TryAddItemFromClass(ExistentAttachment->Attachment->ItemClass).Result != EItemAddResult::IAR_NoItemsAdded)
+			if (Inventory->TryAddItemFromClass(ExistentAttachment->AttachmentDataAsset->ItemClass).Result != EItemAddResult::IAR_NoItemsAdded)
 			{
-				UE_LOGFMT(LogFSC, Display, "{0} added to inventory with success", ExistentAttachment->Attachment->ItemClass->GetName());
+				UE_LOGFMT(LogFSC, Display, "{0} added to inventory with success", ExistentAttachment->AttachmentDataAsset->ItemClass->GetName());
 			}
 			else
 			{
-				UE_LOGFMT(LogFSC, Warning, "Can't add {0} to inventory", ExistentAttachment->Attachment->ItemClass->GetName());
+				UE_LOGFMT(LogFSC, Warning, "Can't add {0} to inventory", ExistentAttachment->AttachmentDataAsset->ItemClass->GetName());
 			}
 		}
 		CurrentAttachments.Remove(ExistentAttachment);
@@ -346,9 +345,9 @@ void UFNRAttachmentWeaponComponent::AddAttachment_Server_Implementation(TSubclas
 	CurrentAttachments.AddUnique(AttachmentSpawned);
 	UE_LOGFMT(LogFSC, Display, "'AttachmentToAdd' was added to Current Attachments array");
 	UFNRInventoryComponent* Inventory = Weapon->CharacterOwner->GetComponentByClass<UFNRInventoryComponent>();
-	if (Inventory && bRemoveFromInventory && !Inventory->FindItemsByClass(AttachmentSpawned->Attachment->ItemClass).IsEmpty())
+	if (Inventory && bRemoveFromInventory && !Inventory->FindItemsByClass(AttachmentSpawned->AttachmentDataAsset->ItemClass).IsEmpty())
 	{
-		UFNRInventoryItem* ItemToRemove = Inventory->FindItemsByClass(AttachmentSpawned->Attachment->ItemClass)[0];
+		UFNRInventoryItem* ItemToRemove = Inventory->FindItemsByClass(AttachmentSpawned->AttachmentDataAsset->ItemClass)[0];
 		if (IsValid(ItemToRemove))
 		{
 			Inventory->RemoveItem(ItemToRemove);
@@ -357,8 +356,8 @@ void UFNRAttachmentWeaponComponent::AddAttachment_Server_Implementation(TSubclas
 	AttachmentSpawned->AttachmentMesh->SetSimulatePhysics(false);
 	AttachmentSpawned->AttachmentMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	AttachmentSpawned->InteractableComponent->SetInteractionActive(false);
-	AttachmentSpawned->AttachToComponent(Weapon->MeshComponent, FAttachmentTransformRules::SnapToTargetIncludingScale, AttachmentSpawned->Attachment->WeaponSocketToAttach);
-	if (!AttachmentSpawned->Attachment->AttachToWeapon)
+	AttachmentSpawned->AttachToComponent(Weapon->MeshComponent, FAttachmentTransformRules::SnapToTargetIncludingScale, AttachmentSpawned->AttachmentDataAsset->WeaponSocketToAttach);
+	if (!AttachmentSpawned->AttachmentDataAsset->AttachToWeapon)
 	{
 		AttachmentSpawned->SetActorHiddenInGame(true);
 	}

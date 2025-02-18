@@ -8,7 +8,7 @@
 #include "RecoilAnimationComponent.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Code/FNRAttachment.h"
-#include "Code/FNRAttachmentWeaponComponent.h"
+#include "Code/FNRAttachmentComponent.h"
 #include "Code/FNRGrenade.h"
 #include "Code/FNRFireWeapon.h"
 #include "Code/FNRMeleeWeapon.h"
@@ -21,7 +21,7 @@
 #include "Net/UnrealNetwork.h"
 #include "Components/SplineComponent.h"
 #include "Components/WidgetComponent.h"
-#include "Data/FNRAttachmentData.h"
+#include "Data/FNRAttachmentDataAsset.h"
 #include "Data/FNRGrenadeWeaponData.h"
 #include "Interactables/FNROblivion.h"
 #include "Interactables/FNROblivionManager.h"
@@ -1096,7 +1096,7 @@ void UFNRWeaponComponent::AttachWeapon_Server_Implementation(AFNRWeapon* Weapon,
 		{
 			for (const auto& ArrayElements: FireWeapon->AttachmentComponent->GetAttachments())
 			{
-				if (ArrayElements->Attachment->AttachToWeapon)
+				if (ArrayElements->AttachmentDataAsset->AttachToWeapon)
 				{
 					ArrayElements->SetActorHiddenInGame(Weapon->IsHidden());
 				}
@@ -1117,7 +1117,7 @@ void UFNRWeaponComponent::AttachWeapon_Server_Implementation(AFNRWeapon* Weapon,
 		{
 			for (const auto& ArrayElements: FireWeapon->AttachmentComponent->GetAttachments())
 			{
-				ArrayElements->SetActorHiddenInGame(!ArrayElements->Attachment->AttachToWeapon);
+				ArrayElements->SetActorHiddenInGame(!ArrayElements->AttachmentDataAsset->AttachToWeapon);
 			}
 		}
 	}

@@ -16,13 +16,6 @@ namespace FscMuzzleFlashModeTags
 	UE_DEFINE_GAMEPLAY_TAG(UseCascade, FName{TEXTVIEW("Frontline.MuzzleFlashMode.UseCascade")})
 }
 
-namespace FscFireAnimationModeTags
-{
-	UE_DEFINE_GAMEPLAY_TAG(UseProceduralFireAnimation, FName{TEXTVIEW("Frontline.FireAnimationMode.ProceduralFireAnimation")})
-
-	UE_DEFINE_GAMEPLAY_TAG(UseBakedFireAnimation, FName{TEXTVIEW("Frontline.FireAnimationMode.BakedFireAnimation")})
-}
-
 namespace FscWeaponTypeTags
 {
 	UE_DEFINE_GAMEPLAY_TAG(AssaultRifle, FName{TEXTVIEW("Frontline.WeaponType.AssaultRifle")})

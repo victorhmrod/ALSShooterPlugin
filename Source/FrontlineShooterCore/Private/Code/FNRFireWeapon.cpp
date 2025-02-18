@@ -11,12 +11,12 @@
 #include "Particles/ParticleSystemComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Code/FNRAttachment.h"
-#include "Code/FNRAttachmentWeaponComponent.h"
+#include "Code/FNRAttachmentComponent.h"
 #include "Code/FNRCartridgeProjectile.h"
 #include "Code/FNRRocketProjectile.h"
 #include "Components/ArrowComponent.h"
 #include "Core/InteractableComponent.h"
-#include "Data/FNRAttachmentData.h"
+#include "Data/FNRAttachmentDataAsset.h"
 #include "Data/FNRFireWeaponData.h"
 #include "Net/Core/PushModel/PushModel.h"
 #include "GameFramework/RotatingMovementComponent.h"
@@ -24,154 +24,277 @@
 
 #pragma region Unreal Defaults
 
+// Constructor for the AFNRFireWeapon class
 AFNRFireWeapon::AFNRFireWeapon()
 {
-	PrimaryActorTick.bCanEverTick = true;
-	AttachmentComponent = CreateDefaultSubobject<UFNRAttachmentWeaponComponent>(FName{TEXTVIEW("AttachmentComponent")});
-	MagazineComponent = CreateDefaultSubobject<UStaticMeshComponent>(FName{TEXTVIEW("MagazineMesh")});
-	MagazineComponent->SetIsReplicated(true);
-	MagazineComponent->SetupAttachment(MeshComponent);
-	MagazineComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	MagazineComponent->SetReceivesDecals(false);
-	IronsightLocationComponent = CreateDefaultSubobject<UArrowComponent>(FName{TEXTVIEW("IronsightCamera")});
-	IronsightLocationComponent->SetupAttachment(MeshComponent);
-	RecoilAnimationComponent = CreateDefaultSubobject<URecoilAnimationComponent>(FName{TEXTVIEW("RecoilAnimationComponent")});
-	RotatingMovementComponent = CreateDefaultSubobject<URotatingMovementComponent>(FName{TEXTVIEW("RotatingMovementComponent")});
-	RotatingMovementComponent->RotationRate = FRotator(0, 90.f, 0);
-	RotatingMovementComponent->SetAutoActivate(false);
+    // Enable ticking for the actor (it will be updated every frame)
+    PrimaryActorTick.bCanEverTick = true;
+    
+    // Initialize the attachment component (for weapon attachments like scopes, etc.)
+    AttachmentComponent = CreateDefaultSubobject<UFNRAttachmentComponent>(FName{TEXTVIEW("AttachmentComponent")});
+    
+    // Initialize the magazine mesh component (for the visual representation of the magazine)
+    MagazineComponent = CreateDefaultSubobject<UStaticMeshComponent>(FName{TEXTVIEW("MagazineMesh")});
+    
+    // Set up the magazine component replication, so it's synchronized across clients
+    MagazineComponent->SetIsReplicated(true);
+    
+    // Attach the magazine component to the main mesh component (the body of the weapon)
+    MagazineComponent->SetupAttachment(MeshComponent);
+    
+    // Disable collisions for the magazine component (it won't interact with the environment physically)
+    MagazineComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    
+    // Disable decals for the magazine component (it won’t receive any decals like bullet holes)
+    MagazineComponent->SetReceivesDecals(false);
+    
+    // Initialize the ironsight location component (for camera alignment when aiming)
+    IronsightLocationComponent = CreateDefaultSubobject<UArrowComponent>(FName{TEXTVIEW("IronsightCamera")});
+    
+    // Attach the ironsight location component to the weapon's mesh
+    IronsightLocationComponent->SetupAttachment(MeshComponent);
+    
+    // Initialize the recoil animation component (for managing recoil effects)
+    RecoilAnimationComponent = CreateDefaultSubobject<URecoilAnimationComponent>(FName{TEXTVIEW("RecoilAnimationComponent")});
+    
+    // Initialize the rotating movement component (for rotating the weapon)
+    RotatingMovementComponent = CreateDefaultSubobject<URotatingMovementComponent>(FName{TEXTVIEW("RotatingMovementComponent")});
+    
+    // Set the rotation speed for the rotating movement component (90 degrees per second)
+    RotatingMovementComponent->RotationRate = FRotator(0, 90.f, 0);
+    
+    // Initially disable the rotating movement component (it won't rotate unless activated)
+    RotatingMovementComponent->SetAutoActivate(false);
 }
 
+// Called every frame to update the weapon (for example, to apply recoil)
 void AFNRFireWeapon::Tick(const float DeltaSeconds)
 {
-	Super::Tick(DeltaSeconds);
-	RefreshRecoilOffset(DeltaSeconds);
+    // Call the parent class's Tick function
+    Super::Tick(DeltaSeconds);
+    
+    // Update recoil offset based on the time that has passed
+    RefreshRecoilOffset(DeltaSeconds);
 }
 
-TArray<UMeshComponent*> AFNRFireWeapon::GetGlowableMeshes() const
-{
-	TArray<UMeshComponent*> FoundArray;
-	FoundArray.Add(MagazineComponent);
-	FoundArray.Append(Super::GetGlowableMeshes());
-	return FoundArray;
-}
-
+// Called when the weapon is first created or spawned
 void AFNRFireWeapon::BeginPlay()
 {
-	Super::BeginPlay();
-	if (!IsValid(WeaponDataAsset))
-	{
-		#if WITH_EDITOR
-			UKismetSystemLibrary::PrintString(this, "You forgot to put the data asset on this weapon", true, true, FLinearColor::Green, 25.f);
-		#endif
-		UE_LOGFMT(LogFSC, Display, "You forgot to put the data asset on this weapon");
-	}
-	if (HasAuthority())
-	{
-		MeshComponent->SetSimulatePhysics(SimulatePhysics);
-	}
-	if (WeaponState.HasTag(FscWeaponStateTags::InAds))
-	{
-		WeaponState.RemoveTag(FscWeaponStateTags::InAds);
-	}
-	CurrentFireMode = Internal_FireWeaponData.StartFireMode;
-	BulletsInMag = FMath::Min(Internal_FireWeaponData.InitialMagAmmo,Internal_FireWeaponData.MaxAmmoInMag);
-	RecoilAnimationComponent->Init(Internal_FireWeaponData.CharacterFireAnim, Internal_FireWeaponData.FireRate, Internal_FireWeaponData.BulletsPerShoot);
-	RecoilAnimationComponent->SetFireMode(Internal_FireWeaponData.StartFireMode);
-	RotatingMovementComponent->SetActive(bEnableRotation, false);
-	InteractableComponent->SetTooltipText(FString::FromInt(BulletsInMag));
+    // Call the parent class's BeginPlay function
+    Super::BeginPlay();
+
+    // Check if the weapon data asset is set (this holds essential data for the weapon)
+    if (!IsValid(WeaponDataAsset))
+    {
+#if WITH_EDITOR
+        // If running in the editor, display an error message if the weapon data asset is missing
+        UKismetSystemLibrary::PrintString(this, FString::Printf(TEXT("You forgot to put the data asset on this weapon: %s"), *GetName()), true, true, FLinearColor::Green, 25.f);
+#endif
+
+        // Log an error message if the weapon data asset is missing
+        UE_LOGFMT(LogFSC, Display, "You forgot to put the data asset on this weapon: %s", *GetName());
+    }
+    else
+    {
+    	// If running in the editor, update every time the strucure
+#if WITH_EDITOR
+
+    	// Load the internal fire weapon data from the weapon data asset
+    	Internal_FireWeaponData = WeaponDataAsset->AsStructure(WeaponDataAsset);
+#endif
+    }
+
+    // If the weapon is running on the server (i.e., authority), enable physics simulation on the mesh
+    if (HasAuthority())
+    {
+        MeshComponent->SetSimulatePhysics(SimulatePhysics);
+    }
+
+    // If the weapon is currently in the "In Ads" state, remove that state (likely means not aiming down sights)
+    if (WeaponState.HasTag(FscWeaponStateTags::InAds))
+    {
+        WeaponState.RemoveTag(FscWeaponStateTags::InAds);
+    }
+
+    // Set the initial fire mode based on the data asset
+    CurrentFireMode = Internal_FireWeaponData.StartFireMode;
+
+    // Initialize the number of bullets in the magazine, ensuring it doesn’t exceed the maximum allowed
+    BulletsInMag = FMath::Min(Internal_FireWeaponData.InitialMagAmmo, Internal_FireWeaponData.MaxAmmoInMag);
+
+    // Initialize the recoil animation component with relevant data (e.g., character animation, fire rate, etc.)
+    RecoilAnimationComponent->Init(
+        Internal_FireWeaponData.CharacterFireAnim, 
+        Internal_FireWeaponData.FireRate, 
+        Internal_FireWeaponData.BulletsPerShoot
+    );
+
+    // Set the fire mode for the recoil animation component
+    RecoilAnimationComponent->SetFireMode(Internal_FireWeaponData.StartFireMode);
+
+    // If rotation is not enabled, deactivate the rotating movement component
+    RotatingMovementComponent->SetActive(bEnableRotation, false);
+
+    // Update the tooltip for the interactable component (displaying the number of bullets in the magazine)
+    InteractableComponent->SetTooltipText(FString::FromInt(BulletsInMag));
 }
 
+// Pre-initialize components before the game starts
 void AFNRFireWeapon::PreInitializeComponents()
 {
-	Super::PreInitializeComponents();
+    // Call the parent class's pre-initialize function
+    Super::PreInitializeComponents();
 }
 
-void AFNRFireWeapon::ReadValues()
-{
-	Super::ReadValues();
-	
-	if (!IsValid(WeaponDataAsset)) return;
-	Internal_FireWeaponData = WeaponDataAsset->AsStructure(WeaponDataAsset);
-	IronsightLocationComponent->AttachToComponent(MeshComponent, FAttachmentTransformRules::SnapToTargetIncludingScale, Internal_FireWeaponData.AimingCameraSocket);
-	MagazineComponent->AttachToComponent(MeshComponent, FAttachmentTransformRules::SnapToTargetIncludingScale, Internal_FireWeaponData.MagazineSocket);
-	if (IsValid(Internal_FireWeaponData.FireSound.LoadSynchronous()))
-	{
-		LoadedFireSound = Internal_FireWeaponData.FireSound.Get();
-	}
-	if (IsValid(Internal_FireWeaponData.WeaponMagazineMesh.LoadSynchronous()))
-	{
-		MagazineComponent->SetStaticMesh(Internal_FireWeaponData.WeaponMagazineMesh.Get());
-	}
-	if (IsValid(Internal_FireWeaponData.ProjectileMaterial.LoadSynchronous()))
-	{
-		LoadedProjectileMaterial = Internal_FireWeaponData.ProjectileMaterial.Get();
-	}
-	if (IsValid(Internal_FireWeaponData.ProjectileNiagaraParticle.LoadSynchronous()))
-	{
-		LoadedProjectileNiagaraParticle = Internal_FireWeaponData.ProjectileNiagaraParticle.Get();
-	}
-	if (IsValid(Internal_FireWeaponData.ProjectileMaterial.LoadSynchronous()))
-	{
-		LoadedProjectileMaterial = Internal_FireWeaponData.ProjectileMaterial.Get();
-	}
-	if (IsValid(CartridgeProjectileClass.LoadSynchronous()))
-	{
-		LoadedCartridgeProjectileClass = CartridgeProjectileClass.Get();
-	}
-	if (IsValid(RocketProjectileClass.LoadSynchronous()))
-	{
-		LoadedRocketProjectileClass = RocketProjectileClass.Get();
-	}
-	if (IsValid(Internal_FireWeaponData.CharacterReloadMontage.LoadSynchronous()))
-	{
-		LoadedReloadCharacterMontage = Internal_FireWeaponData.CharacterReloadMontage.Get();
-	}
-	if (IsValid(Internal_FireWeaponData.EmptyMagSound.LoadSynchronous()))
-	{
-		LoadedEmptyMagSound = Internal_FireWeaponData.EmptyMagSound.Get();
-	}
-	if (IsValid(Internal_FireWeaponData.SilencedFireSound.LoadSynchronous()))
-	{
-		LoadedSilencedSound = Internal_FireWeaponData.SilencedFireSound.Get();
-	}
-	if (IsValid(Internal_FireWeaponData.MuzzleFlashCascadeParticle.LoadSynchronous()))
-	{
-		LoadedCascadedParticle = Internal_FireWeaponData.MuzzleFlashCascadeParticle.Get();
-	}
-	if (IsValid(Internal_FireWeaponData.WeaponMagazineMesh.LoadSynchronous()))
-	{
-		LoadedMagazineMesh = Internal_FireWeaponData.WeaponMagazineMesh.Get();
-	}
-	if (IsValid(Internal_FireWeaponData.WeaponReloadAnim.LoadSynchronous()))
-	{
-		LoadedWeaponReloadAnim = Internal_FireWeaponData.WeaponReloadAnim.Get();
-	}
-	if (IsValid(Internal_FireWeaponData.MuzzleFlashNiagaraParticle.LoadSynchronous()))
-	{
-		LoadedNiagaraParticle = Internal_FireWeaponData.MuzzleFlashNiagaraParticle.Get();
-	}
-}
-
+// Set up replication for networked gameplay (e.g., synchronizing weapon properties between server and clients)
 void AFNRFireWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
-	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	
-	DOREPLIFETIME(AFNRFireWeapon, CharacterOwner);
-	DOREPLIFETIME(AFNRFireWeapon, WeaponSystem);
-	DOREPLIFETIME(AFNRFireWeapon, SimulatePhysics);
-	DOREPLIFETIME(AFNRFireWeapon, RecoilOffset);
-	DOREPLIFETIME(AFNRFireWeapon, WeaponState);
-	FDoRepLifetimeParams BulletParameters;
-	BulletParameters.bIsPushBased = true;
-	BulletParameters.Condition = COND_SkipOwner;
-	BulletParameters.RepNotifyCondition = REPNOTIFY_Always;
-	DOREPLIFETIME_WITH_PARAMS_FAST(AFNRFireWeapon, CartridgeSpawnData, BulletParameters);
-	DOREPLIFETIME_WITH_PARAMS_FAST(AFNRFireWeapon, RocketSpawnData, BulletParameters);
+    // Call the parent class's function to replicate properties
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+    
+    // Replicate relevant properties for network synchronization
+    DOREPLIFETIME(AFNRFireWeapon, CharacterOwner);
+    DOREPLIFETIME(AFNRFireWeapon, WeaponSystem);
+    DOREPLIFETIME(AFNRFireWeapon, SimulatePhysics);
+    DOREPLIFETIME(AFNRFireWeapon, RecoilOffset);
+    DOREPLIFETIME(AFNRFireWeapon, WeaponState);
+    
+    // Replicate the bullet data with specific conditions for better network performance
+    FDoRepLifetimeParams BulletParameters;
+    BulletParameters.bIsPushBased = true;  // Use push-based replication
+    BulletParameters.Condition = COND_SkipOwner;  // Don’t replicate to the owner
+    BulletParameters.RepNotifyCondition = REPNOTIFY_Always;  // Always notify of changes
+    DOREPLIFETIME_WITH_PARAMS_FAST(AFNRFireWeapon, CartridgeSpawnData, BulletParameters);
+    DOREPLIFETIME_WITH_PARAMS_FAST(AFNRFireWeapon, RocketSpawnData, BulletParameters);
 }
 
 #pragma endregion Unreal Defaults
 
 #pragma region CPP Only
+
+// Get all meshes that should be glowable (e.g., highlighted in certain states)
+TArray<UMeshComponent*> AFNRFireWeapon::GetGlowableMeshes() const
+{
+    // Initialize an array to store glowable meshes
+    TArray<UMeshComponent*> FoundArray;
+    
+    // Add the magazine component (it could be glowable in certain contexts)
+    FoundArray.Add(MagazineComponent);
+    
+    // Append glowable meshes from the parent class
+    FoundArray.Append(Super::GetGlowableMeshes());
+    
+    // Return the complete array of glowable meshes
+    return FoundArray;
+}
+
+// Read values from the weapon data asset and apply them to the weapon components
+void AFNRFireWeapon::ReadValues()
+{
+    // Call the base class's ReadValues function to read any common values
+    Super::ReadValues();
+    
+    // If the WeaponDataAsset is invalid, exit early
+    if (!IsValid(WeaponDataAsset)) return;
+
+    // Load the internal fire weapon data from the weapon data asset
+    Internal_FireWeaponData = WeaponDataAsset->AsStructure(WeaponDataAsset);
+
+    // Attach the ironsight location component to the mesh at the specified aiming socket
+    IronsightLocationComponent->AttachToComponent(MeshComponent, FAttachmentTransformRules::SnapToTargetIncludingScale, Internal_FireWeaponData.AimingCameraSocket);
+    
+    // Attach the magazine component to the mesh at the specified magazine socket
+    MagazineComponent->AttachToComponent(MeshComponent, FAttachmentTransformRules::SnapToTargetIncludingScale, Internal_FireWeaponData.MagazineSocket);
+
+    // Check if the fire sound is valid, and if so, load it into the LoadedFireSound variable
+    if (IsValid(Internal_FireWeaponData.FireSound.LoadSynchronous()))
+    {
+        LoadedFireSound = Internal_FireWeaponData.FireSound.Get();
+    }
+
+    // Check if the magazine mesh is valid, and if so, set it on the MagazineComponent
+    if (IsValid(Internal_FireWeaponData.WeaponMagazineMesh.LoadSynchronous()))
+    {
+        MagazineComponent->SetStaticMesh(Internal_FireWeaponData.WeaponMagazineMesh.Get());
+    }
+
+    if (IsValid(Internal_FireWeaponData.FireSoundAttenuation.LoadSynchronous()))
+    {
+    	LoadedAttenuationSound =Internal_FireWeaponData.FireSoundAttenuation.Get();
+    }
+
+    // Check if the projectile material is valid, and if so, load it into LoadedProjectileMaterial
+    if (IsValid(Internal_FireWeaponData.ProjectileMaterial.LoadSynchronous()))
+    {
+        LoadedProjectileMaterial = Internal_FireWeaponData.ProjectileMaterial.Get();
+    }
+
+    // Check if the Niagara particle system for the projectile is valid, and if so, load it
+    if (IsValid(Internal_FireWeaponData.ProjectileNiagaraParticle.LoadSynchronous()))
+    {
+        LoadedProjectileNiagaraParticle = Internal_FireWeaponData.ProjectileNiagaraParticle.Get();
+    }
+
+    // Load the projectile material again if it's valid (this is a duplicate check)
+    if (IsValid(Internal_FireWeaponData.ProjectileMaterial.LoadSynchronous()))
+    {
+        LoadedProjectileMaterial = Internal_FireWeaponData.ProjectileMaterial.Get();
+    }
+
+    // Check if the cartridge projectile class is valid, and if so, load it
+    if (IsValid(CartridgeProjectileClass.LoadSynchronous()))
+    {
+        LoadedCartridgeProjectileClass = CartridgeProjectileClass.Get();
+    }
+
+    // Check if the rocket projectile class is valid, and if so, load it
+    if (IsValid(RocketProjectileClass.LoadSynchronous()))
+    {
+        LoadedRocketProjectileClass = RocketProjectileClass.Get();
+    }
+
+    // Check if the reload animation for the character is valid, and if so, load it
+    if (IsValid(Internal_FireWeaponData.CharacterReloadMontage.LoadSynchronous()))
+    {
+        LoadedReloadCharacterMontage = Internal_FireWeaponData.CharacterReloadMontage.Get();
+    }
+
+    // Check if the empty magazine sound is valid, and if so, load it
+    if (IsValid(Internal_FireWeaponData.EmptyMagSound.LoadSynchronous()))
+    {
+        LoadedEmptyMagSound = Internal_FireWeaponData.EmptyMagSound.Get();
+    }
+
+    // Check if the silenced fire sound is valid, and if so, load it
+    if (IsValid(Internal_FireWeaponData.SilencedFireSound.LoadSynchronous()))
+    {
+        LoadedSilencedSound = Internal_FireWeaponData.SilencedFireSound.Get();
+    }
+
+    // Check if the muzzle flash particle system (cascade) is valid, and if so, load it
+    if (IsValid(Internal_FireWeaponData.MuzzleFlashCascadeParticle.LoadSynchronous()))
+    {
+        LoadedCascadedParticle = Internal_FireWeaponData.MuzzleFlashCascadeParticle.Get();
+    }
+
+    // Check if the weapon magazine mesh is valid (again), and if so, load it
+    if (IsValid(Internal_FireWeaponData.WeaponMagazineMesh.LoadSynchronous()))
+    {
+        LoadedMagazineMesh = Internal_FireWeaponData.WeaponMagazineMesh.Get();
+    }
+
+    // Check if the reload animation for the weapon is valid, and if so, load it
+    if (IsValid(Internal_FireWeaponData.WeaponReloadAnim.LoadSynchronous()))
+    {
+        LoadedWeaponReloadAnim = Internal_FireWeaponData.WeaponReloadAnim.Get();
+    }
+
+    // Check if the muzzle flash particle system (Niagara) is valid, and if so, load it
+    if (IsValid(Internal_FireWeaponData.MuzzleFlashNiagaraParticle.LoadSynchronous()))
+    {
+        LoadedNiagaraParticle = Internal_FireWeaponData.MuzzleFlashNiagaraParticle.Get();
+    }
+}
 
 void AFNRFireWeapon::RefreshRecoilOffset(const float DeltaTime)
 {
@@ -181,50 +304,58 @@ void AFNRFireWeapon::RefreshRecoilOffset(const float DeltaTime)
     // Check if recoil is being applied
     if (bApplyingRecoil)
     {
-	    // Update detection timer
-    	LastRecoilUpdate += DeltaTime;
+    	RecoilTime += Internal_FireWeaponData.RecoilTimeVelocity;
+        
+        // Get the recoil values from the curves at the correct time
+        float BasePitchRecoil = Internal_FireWeaponData.RecoilPitchCurve->GetFloatValue(RecoilTime);
+        float BaseYawRecoil = Internal_FireWeaponData.RecoilYawCurve->GetFloatValue(RecoilTime);
+        
+        // Apply attachment multipliers (barrel, stock) to the recoil values
+        const auto& Barrel = AttachmentComponent->GetAttachmentByType(EAttachmentType::Barrel);
+        if (Barrel)
+        {
+            // Multiply the pitch and yaw recoil based on the barrel attachment's multipliers
+            BasePitchRecoil *= Barrel->AttachmentDataAsset->BarrelVRecoilMultiplier;
+            BaseYawRecoil *= Barrel->AttachmentDataAsset->BarrelHRecoilMultiplier;
+        }
+        const auto& Stock = AttachmentComponent->GetAttachmentByType(EAttachmentType::Stock);
+        if (Stock)
+        {
+            // Multiply the pitch and yaw recoil based on the stock attachment's multipliers
+            BasePitchRecoil *= Stock->AttachmentDataAsset->BarrelVRecoilMultiplier;
+            BaseYawRecoil *= Stock->AttachmentDataAsset->BarrelHRecoilMultiplier;
+        }
 
-    	// Perform detection check at defined intervals
-    	if (LastRecoilUpdate >= RecoilUpdateDelay)
-    	{
-    		LastRecoilUpdate = 0.f;
-    		RecoilTime += Internal_FireWeaponData.RecoilTimeVelocity;
-    	}
-    	
-    	// Get the recoil values from the curves at the correct time
-    	float BasePitchRecoil = Internal_FireWeaponData.RecoilPitchCurve->GetFloatValue(RecoilTime);
-    	float BaseYawRecoil = Internal_FireWeaponData.RecoilYawCurve->GetFloatValue(RecoilTime);
-    	
-    	// Apply attachment multipliers (barrel, stock) to the recoil values
-    	if (const auto& Barrel = AttachmentComponent->GetAttachmentByType(EAttachmentType::Barrel))
-    	{
-    		// Multiply the pitch and yaw recoil based on the barrel attachment's multipliers
-    		BasePitchRecoil *= Barrel->Attachment->BarrelVRecoilMultiplier;
-    		BaseYawRecoil *= Barrel->Attachment->BarrelHRecoilMultiplier;
-    	}
-    	if (const auto& Stock = AttachmentComponent->GetAttachmentByType(EAttachmentType::Stock))
-    	{
-    		// Multiply the pitch and yaw recoil based on the stock attachment's multipliers
-    		BasePitchRecoil *= Stock->Attachment->BarrelVRecoilMultiplier;
-    		BaseYawRecoil *= Stock->Attachment->BarrelHRecoilMultiplier;
-    	}
+        // Apply recoil multipliers for the character's weapon component interface (affects both pitch and yaw)
+        const float RecoilMultiplier = GetWeaponComponentInterface()->Execute_GetRecoilMultiplier(CharacterOwner);
+        
+        // Smoothly interpolate the current pitch recoil with standard velocity
+        CurrentPitchRecoil = FMath::FInterpTo(CurrentPitchRecoil, BasePitchRecoil, DeltaTime, Internal_FireWeaponData.RecoilVelocity);
+        
+        // Avoid excessive smoothing on yaw recoil to follow the curve more closely
+        // Apply yaw recoil directly to avoid over-smoothing
+        CurrentYawRecoil = BaseYawRecoil; // Direct application of recoil from the curve
 
-    	// Smoothly interpolate the current pitch and yaw recoil towards the base recoil values
-    	// Note: Do not excessively smooth the yaw recoil for a more natural feel
-    	CurrentPitchRecoil = FMath::FInterpTo(CurrentPitchRecoil, BasePitchRecoil, DeltaTime, Internal_FireWeaponData.RecoilVelocity);
-    	CurrentYawRecoil = FMath::FInterpTo(CurrentYawRecoil, BaseYawRecoil, DeltaTime, Internal_FireWeaponData.RecoilVelocity);
-
-    	// Apply the recoil to the character's controller input
-    	CharacterOwner->AddControllerPitchInput(CurrentPitchRecoil * GetWeaponComponentInterface()->Execute_GetSpreadMultiplier(CharacterOwner));
-    	CharacterOwner->AddControllerYawInput(CurrentYawRecoil * GetWeaponComponentInterface()->Execute_GetSpreadMultiplier(CharacterOwner));
+        // Apply the recoil to the character's controller input (multiplied by recoil multipliers)
+        CharacterOwner->AddControllerPitchInput(CurrentPitchRecoil * RecoilMultiplier);
+        CharacterOwner->AddControllerYawInput(CurrentYawRecoil * RecoilMultiplier);
+    }
+    else
+    {
+        // Reset recoil time when no recoil is being applied
+        RecoilTime = 0.f;
+    	CurrentPitchRecoil = 0.f;
+    	CurrentYawRecoil = 0.f;
     }
 }
 
+// Auto-fire function for continuous fire
 bool AFNRFireWeapon::AutoFire()
 {
-    // Check if weapon is ready to fire
+    // Check if the weapon is ready to fire
     if (bWantsFire && WeaponState.HasTag(FscWeaponStateTags::CanFire) && !bIsReloading && !bInFireRateDelay && HasAmmo())
     {
+        // Notify server that the weapon is firing
         Server_SetIsFiring(true);
         bInFireRateDelay = true;
 
@@ -234,36 +365,30 @@ bool AFNRFireWeapon::AutoFire()
             --BulletsInMag;
         }
 
-        // Fire multiple bullets (burst fire logic)
+        // Fire multiple bullets for burst fire
         for (int i = 0; i < Internal_FireWeaponData.BulletsPerShoot; i++)
         {
             K2_Fire();
-            const FHitResult HitResult = FireTrace();
+            const FHitResult HitResult = FireTrace();  // Trace the shot
             const FVector MuzzleLocation = MeshComponent->GetSocketLocation(GetGeneralData().MuzzleSocket);
             const FRotator ProjectileRotation = GetSpread(UKismetMathLibrary::FindLookAtRotation(MuzzleLocation, HitResult.bBlockingHit ? HitResult.ImpactPoint : HitResult.TraceEnd), 0);
 
-            FireProjectile(FTransform{ProjectileRotation, MuzzleLocation, FVector::One()});
-            WeaponSystem->OnFire.Broadcast();
+            FireProjectile(FTransform{ProjectileRotation, MuzzleLocation, FVector::One()});  // Fire the projectile
+            WeaponSystem->OnFire.Broadcast();  // Trigger fire event
         }
 
         // Play firing animations
         MeshComponent->PlayAnimation(LoadedWeaponFireAnim, false);
         RecoilAnimationComponent->Play();
 
-        // Handle baked fire animation if necessary
-        if (Internal_FireWeaponData.FireAnimationMode.HasTag(FscFireAnimationModeTags::UseBakedFireAnimation))
-        {
-            WeaponSystem->PlayMontage_Server(LoadedFireCharacterMontage);
-        }
-
         // Set a timer for the fire rate delay
         GetWorldTimerManager().SetTimer(InFireRateTimerHandle, [this]
         {
             bInFireRateDelay = false;
-            AutoFire(); // Call AutoFire again if the timer completes
+            AutoFire();  // Call AutoFire again after delay
         }, GetFireRate(), false);
 
-        // Set recoil applying to true when firing
+        // Enable recoil during firing
         bApplyingRecoil = true;
 
         return true;
@@ -275,20 +400,23 @@ bool AFNRFireWeapon::AutoFire()
         UGameplayStatics::PlaySoundAtLocation(this, LoadedEmptyMagSound, MeshComponent->GetSocketLocation(GetGeneralData().MuzzleSocket), FRotator::ZeroRotator, 0.5f);
     }
 
-    // Stop firing and recoil animation
+    // Stop firing and recoil animations
     bApplyingRecoil = false;
     RecoilTime = 0.0f;
     Server_SetIsFiring(false);
     RecoilAnimationComponent->Stop();
     GetWeaponComponentInterface()->Execute_OnWeaponFiredOnce(CharacterOwner, false);
+
     return false;
 }
 
+// Semi-fire function for single shots
 bool AFNRFireWeapon::SemiFire()
 {
-    // Check if weapon is ready to fire
+    // Check if the weapon is ready to fire
     if (bWantsFire && WeaponState.HasTag(FscWeaponStateTags::CanFire) && !bIsReloading && !bInFireRateDelay && HasAmmo())
     {
+        // Notify server that the weapon is firing
         Server_SetIsFiring(true);
         bInFireRateDelay = true;
 
@@ -298,37 +426,31 @@ bool AFNRFireWeapon::SemiFire()
             --BulletsInMag;
         }
 
-        // Fire a single bullet (semi-fire logic)
+        // Fire a single bullet for semi-auto fire
         for (int i = 0; i < Internal_FireWeaponData.BulletsPerShoot; i++)
         {
             K2_Fire();
-            const FHitResult HitResult = FireTrace();
+            const FHitResult HitResult = FireTrace();  // Trace the shot
             const FVector MuzzleLocation = MeshComponent->GetSocketLocation(GetGeneralData().MuzzleSocket);
             const FRotator ProjectileRotation = GetSpread(UKismetMathLibrary::FindLookAtRotation(MuzzleLocation, HitResult.bBlockingHit ? HitResult.ImpactPoint : HitResult.TraceEnd), 0);
 
-            FireProjectile(FTransform{ProjectileRotation, MuzzleLocation, FVector::One()});
-            WeaponSystem->OnFire.Broadcast();
+            FireProjectile(FTransform{ProjectileRotation, MuzzleLocation, FVector::One()});  // Fire the projectile
+            WeaponSystem->OnFire.Broadcast();  // Trigger fire event
         }
 
         // Play firing animations
         MeshComponent->PlayAnimation(LoadedWeaponFireAnim, false);
         RecoilAnimationComponent->Play();
 
-        // Handle baked fire animation if necessary
-        if (Internal_FireWeaponData.FireAnimationMode.HasTag(FscFireAnimationModeTags::UseBakedFireAnimation))
-        {
-            WeaponSystem->PlayMontage_Server(LoadedFireCharacterMontage);
-        }
-
         // Set a timer for the fire rate delay
         GetWorldTimerManager().SetTimer(InFireRateTimerHandle, [this]()
         {
             bInFireRateDelay = false;
             Server_SetIsFiring(false);
-        	bApplyingRecoil = false;
+            bApplyingRecoil = false;
         }, GetFireRate(), false);
 
-        // Set recoil applying to true when firing
+        // Enable recoil during firing
         bApplyingRecoil = true;
 
         // Notify that firing occurred
@@ -342,15 +464,17 @@ bool AFNRFireWeapon::SemiFire()
         UGameplayStatics::PlaySoundAtLocation(this, LoadedEmptyMagSound, MeshComponent->GetSocketLocation(GetGeneralData().MuzzleSocket));
     }
 
-    // Stop firing and recoil animation
+    // Stop firing and recoil animations
     Server_SetIsFiring(false);
     RecoilAnimationComponent->Stop();
     GetWeaponComponentInterface()->Execute_OnWeaponFiredOnce(CharacterOwner, false);
     bApplyingRecoil = false;
     RecoilTime = 0.0f;
+
     return false;
 }
 
+// Burst-fire function for rapid-fire shots
 bool AFNRFireWeapon::BurstFire()
 {
     // If a fire timer already exists, stop firing and reset recoil
@@ -392,7 +516,7 @@ bool AFNRFireWeapon::BurstFire()
     Server_SetIsFiring(true);
     BulletsRemaining = Internal_FireWeaponData.BulletsPerShoot - 1;
 
-    // Handle burst fire logic
+    // Handle burst fire logic with a timer
     GetWorldTimerManager().SetTimer(FireWithDelayTimerHandle, [this]
     {
         if (BulletsInMag > 0 && BulletsRemaining > 0)
@@ -430,10 +554,6 @@ bool AFNRFireWeapon::BurstFire()
 
     // Play fire animation
     RecoilAnimationComponent->Play();
-    if (Internal_FireWeaponData.FireAnimationMode.HasTag(FscFireAnimationModeTags::UseBakedFireAnimation))
-    {
-        WeaponSystem->PlayMontage_Server(LoadedFireCharacterMontage);
-    }
     MeshComponent->PlayAnimation(LoadedWeaponFireAnim, false);
 
     // Set delay for fire rate control
@@ -445,14 +565,20 @@ bool AFNRFireWeapon::BurstFire()
     return true;
 }
 
+// Perform a trace to detect hits from the weapon's fire
 FHitResult AFNRFireWeapon::FireTrace()
 {
+	FHitResult HitResult;
+	// Check if the CharacterOwner is valid
 	if (!IsValid(CharacterOwner))
 	{
-		return{};
+		return HitResult;
 	}
+
 	FVector CameraLocation{};
 	FRotator CameraRotation{};
+
+	// Get the view point based on the character's control type (bot or player)
 	if (CharacterOwner->IsBotControlled() || !CharacterOwner->IsPlayerControlled())
 	{
 		CharacterOwner->GetActorEyesViewPoint(CameraLocation, CameraRotation);
@@ -462,11 +588,29 @@ FHitResult AFNRFireWeapon::FireTrace()
 		CameraLocation = GetWeaponComponentInterface()->GetCameraTransform().GetLocation();
 		CameraRotation = GetWeaponComponentInterface()->GetCameraTransform().Rotator();
 	}
+
+	// Calculate the distance between the origin point (weapon muzzle) and the end point of the trace line
 	const FVector StartLocation = CameraLocation + CameraRotation.Vector() * (CameraLocation - MeshComponent->GetSocketLocation(GetGeneralData().MuzzleSocket)).Length();
 	const FVector EndLocation = StartLocation + CameraRotation.Vector() * 100000.0f;
-	FHitResult HitResult;
+
+	// Define the actors to ignore during the trace (like the character and weapon)
 	const TArray<AActor*> ActorsToIgnore{this, CharacterOwner};
-	UKismetSystemLibrary::LineTraceSingle(this, StartLocation, EndLocation, UEngineTypes::ConvertToTraceType(WeaponSystem->TraceChannel), false, ActorsToIgnore, WeaponSystem->GetDrawDebugType(), HitResult, true);
+
+	// Set the trace channel and debug options
+	FCollisionQueryParams QueryParams;
+	QueryParams.AddIgnoredActors(ActorsToIgnore);
+	QueryParams.bTraceComplex = true; // Perform more detailed collision tracing, if needed
+	QueryParams.bReturnPhysicalMaterial = false;
+
+	// Perform the line trace
+	UKismetSystemLibrary::LineTraceSingle(
+		this, StartLocation, EndLocation, 
+		UEngineTypes::ConvertToTraceType(WeaponSystem->TraceChannel), 
+		false, ActorsToIgnore, 
+		WeaponSystem->GetDrawDebugType(), 
+		HitResult, true
+	);
+	
 	return HitResult;
 }
 
@@ -572,7 +716,7 @@ void AFNRFireWeapon::Multicast_SetIsFiring_Implementation(const bool bFiring)
 		UGameplayStatics::PlaySoundAtLocation(this, 
 			AttachmentComponent->GetAttachmentByType(EAttachmentType::Suppressor) ? LoadedSilencedSound : LoadedFireSound, 
 			MeshComponent->GetSocketLocation(GetGeneralData().MuzzleSocket), 
-			FRotator::ZeroRotator, 0.2f);
+			FRotator::ZeroRotator, 1.f, 1.f, 0.f, LoadedAttenuationSound ? LoadedAttenuationSound : nullptr);
 	}
 }
 
@@ -651,7 +795,7 @@ bool AFNRFireWeapon::AIFire(const bool bFire, const FVector TargetLocation, cons
 
 float AFNRFireWeapon::GetFireRate() const
 {
-	return AttachmentComponent->GetAttachmentByType(EAttachmentType::Bolt) ? 60 / (Internal_FireWeaponData.FireRate * AttachmentComponent->GetAttachmentByType(EAttachmentType::Bolt)->Attachment->FireRateMultiplier) : 60 / Internal_FireWeaponData.FireRate;
+	return AttachmentComponent->GetAttachmentByType(EAttachmentType::Bolt) ? 60 / (Internal_FireWeaponData.FireRate * AttachmentComponent->GetAttachmentByType(EAttachmentType::Bolt)->AttachmentDataAsset->FireRateMultiplier) : 60 / Internal_FireWeaponData.FireRate;
 }
 
 void AFNRFireWeapon::Reload()
@@ -739,7 +883,7 @@ void AFNRFireWeapon::SpawnCartridgeProjectile(const FTransform& ProjectileTransf
 		ProjectileRef->Damage = FMath::FRandRange(Internal_FireWeaponData.DamageRange.X, Internal_FireWeaponData.DamageRange.Y);
 		if (const auto& Barrel = AttachmentComponent->GetAttachmentByType(EAttachmentType::Barrel))
 		{
-			ProjectileRef->Damage *= Barrel->Attachment->DamageMultiplier;
+			ProjectileRef->Damage *= Barrel->AttachmentDataAsset->DamageMultiplier;
 		}
 		ProjectileRef->MuzzleVelocity = FMath::FRandRange(Internal_FireWeaponData.ProjectileVelocity.X, Internal_FireWeaponData.ProjectileVelocity.Y);
 		ProjectileRef->ProjectileMaterial = LoadedProjectileMaterial;
@@ -756,7 +900,7 @@ void AFNRFireWeapon::SpawnRocketProjectile(const FTransform& ProjectileTransform
 		ProjectileRef->Damage = FMath::FRandRange(Internal_FireWeaponData.DamageRange.X, Internal_FireWeaponData.DamageRange.Y);
 		if (const auto& Barrel = AttachmentComponent->GetAttachmentByType(EAttachmentType::Barrel))
 		{
-			ProjectileRef->Damage *= Barrel->Attachment->DamageMultiplier;
+			ProjectileRef->Damage *= Barrel->AttachmentDataAsset->DamageMultiplier;
 		}
 		UGameplayStatics::FinishSpawningActor(ProjectileRef, ProjectileTransform);
 	}
@@ -797,7 +941,7 @@ void AFNRFireWeapon::EndReload()
 {
 	const int StoredAmmo = WeaponSystem->GetAmmoByType(Internal_FireWeaponData.AmmoMode);
 	const AFNRAttachment* AmmoAttachment = AttachmentComponent->GetAttachmentByType(EAttachmentType::Ammo);
-	const int MaxAmmoInMag = AmmoAttachment ? Internal_FireWeaponData.MaxAmmoInMag + AmmoAttachment->Attachment->AddToMaxBullets : Internal_FireWeaponData.MaxAmmoInMag;
+	const int MaxAmmoInMag = AmmoAttachment ? Internal_FireWeaponData.MaxAmmoInMag + AmmoAttachment->AttachmentDataAsset->AddToMaxBullets : Internal_FireWeaponData.MaxAmmoInMag;
 	const int BulletsToAdd = StoredAmmo < MaxAmmoInMag ? FMath::Min(StoredAmmo, MaxAmmoInMag - BulletsInMag) :
 	MaxAmmoInMag - BulletsInMag;
 	BulletsInMag += BulletsToAdd;
@@ -812,7 +956,7 @@ void AFNRFireWeapon::EndReloadByAnim(const int Quantity)
 {
 	const int StoredAmmo = WeaponSystem->GetAmmoByType(Internal_FireWeaponData.AmmoMode);
 	const AFNRAttachment* AmmoAttachment = AttachmentComponent->GetAttachmentByType(EAttachmentType::Ammo);
-	const int MaxAmmoInMag = AmmoAttachment ? Internal_FireWeaponData.MaxAmmoInMag + AmmoAttachment->Attachment->AddToMaxBullets : Internal_FireWeaponData.MaxAmmoInMag;
+	const int MaxAmmoInMag = AmmoAttachment ? Internal_FireWeaponData.MaxAmmoInMag + AmmoAttachment->AttachmentDataAsset->AddToMaxBullets : Internal_FireWeaponData.MaxAmmoInMag;
 	const int BulletsToAdd = StoredAmmo < Quantity ? FMath::Min(StoredAmmo, MaxAmmoInMag - BulletsInMag) :
 	FMath::Min(Quantity, MaxAmmoInMag - BulletsInMag);
 	BulletsInMag += BulletsToAdd;

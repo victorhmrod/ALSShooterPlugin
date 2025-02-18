@@ -6,7 +6,7 @@
 #include "FSCTypes.h"
 #include "Engine/DataAsset.h"
 #include "Utils/RbsTypes.h"
-#include "FNRAttachmentData.generated.h"
+#include "FNRAttachmentDataAsset.generated.h"
 
 UENUM()
 enum ECompatiblity
@@ -16,16 +16,16 @@ enum ECompatiblity
 };
 
 UCLASS(DisplayName="AttachmentData")
-class FRONTLINESHOOTERCORE_API UFNRAttachmentData : public UDataAsset
+class FRONTLINESHOOTERCORE_API UFNRAttachmentDataAsset : public UDataAsset
 {
 	GENERATED_BODY()
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Info")
-	FName DisplayName{"Attachment"};
+	FName Name{"Attachment"};
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Info")
-	FName TooltipName{"Attachment ToolTip"};
+	FText Tooltip{};
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Info")
 	FSlateBrush Icon;

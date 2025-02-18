@@ -38,7 +38,7 @@ public:
 	TObjectPtr<UStaticMeshComponent> MagazineComponent;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
-	TObjectPtr<class UFNRAttachmentWeaponComponent> AttachmentComponent;
+	TObjectPtr<class UFNRAttachmentComponent> AttachmentComponent;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TObjectPtr<class UArrowComponent> IronsightLocationComponent;
@@ -125,6 +125,10 @@ public:
 	#pragma region Loaded
 	UPROPERTY()
 	USoundBase* LoadedFireSound;
+
+	
+	UPROPERTY()
+	USoundAttenuation* LoadedAttenuationSound;
 	
 	UPROPERTY()
 	UAnimMontage* LoadedReloadCharacterMontage;
@@ -159,16 +163,12 @@ public:
 	AFNRFireWeapon();
 
 	virtual void Tick(float DeltaSeconds) override;
-
-	virtual TArray<class UMeshComponent*> GetGlowableMeshes() const override;
 	
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
 	virtual void PreInitializeComponents() override;
-
-	virtual void ReadValues() override;
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
@@ -177,6 +177,10 @@ protected:
 	#pragma region CPP Only
 protected:
 	FTimerHandle ResetRecoilTimerHandle;
+	
+	virtual TArray<class UMeshComponent*> GetGlowableMeshes() const override;
+
+	virtual void ReadValues() override;
 	
 	FHitResult FireTrace();
 	
@@ -264,11 +268,7 @@ private:
 	#pragma endregion Replicated Functions
 
 
-protected:
-	float LastRecoilUpdate{0};
-
-	float RecoilUpdateDelay{0.5f};
-	
+protected:	
 	void RefreshRecoilOffset(float DeltaTime);
 
 	FTimerHandle RecoilUpdateTimerHandle;

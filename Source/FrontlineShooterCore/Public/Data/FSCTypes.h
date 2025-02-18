@@ -23,13 +23,6 @@ namespace FscMuzzleFlashModeTags
 	FRONTLINESHOOTERCORE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(UseCascade)
 }
 
-namespace FscFireAnimationModeTags
-{
-	FRONTLINESHOOTERCORE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(UseProceduralFireAnimation)
-	
-	FRONTLINESHOOTERCORE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(UseBakedFireAnimation)
-}
-
 namespace FscWeaponTypeTags
 {
 	FRONTLINESHOOTERCORE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(AssaultRifle)
@@ -152,68 +145,111 @@ struct FGeneralWeaponData : public FTableRowBase
 {
 	GENERATED_USTRUCT_BODY()
 	
-	// Weapon Info
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "General")
+	// ----------- General Weapon Information -----------
+	// Name of the weapon
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Info", Meta = (Tooltip = "Name of the weapon"))
 	FName WeaponName;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "General")
+	
+	// Icon for the weapon
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Info", Meta = (Tooltip = "Icon for the weapon"))
 	FSlateBrush WeaponIcon;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "General")
+	
+	// Mode of the weapon (e.g., Assault Rifle, Sniper)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Info", Meta = (Tooltip = "Mode of the weapon (e.g., Assault Rifle, Sniper)"))
 	FGameplayTag WeaponMode{FscWeaponTypeTags::AssaultRifle};
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "General")
-	FGameplayTag RarityMode{FscRarityType::Commom};
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "General")
-	bool bShouldSway{true};
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "General")
+	
+	// Rarity of the weapon (e.g., Common, Rare)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Info", Meta = (Tooltip = "Rarity of the weapon (e.g., Common, Rare)"))
+	FGameplayTag Rarity{FscRarityType::Commom};
+	
+	// Should the weapon have sway effects when moving?
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Info", Meta = (Tooltip = "Should the weapon have sway effects when moving?"))
+	bool bShouldUseSway{true};
+	
+	// Should the weapon have a reticle when aiming?
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Info", Meta = (Tooltip = "Should the weapon have a reticle when aiming?"))
 	bool bShouldUseReticle{true};
 	
-	// Meshes
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "General")
+	// ----------- Weapon Meshes & Animation -----------
+	// Skeletal mesh for the weapon body
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Meshes & Animations", Meta = (Tooltip = "Skeletal mesh for the weapon body"))
 	TSoftObjectPtr<USkeletalMesh> WeaponBodyMesh{nullptr};
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "General")
+	
+	// Animation class for the weapon's behavior
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Meshes & Animations", Meta = (Tooltip = "Animation class for the weapon's behavior"))
 	TSoftClassPtr<UAnimInstance> WeaponAnimInstance{nullptr};
 
-	// Character Animations
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animations")
+	// ----------- Character Animations -----------
+	// Tag for the overlay mode for character animations
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Character Animations", Meta = (Tooltip = "Tag for the overlay mode for character animations"))
 	FGameplayTag OverlayMode = FGameplayTag::EmptyTag;
 	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animations|Character")
+	// Character equip animation montage
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Character Animations", Meta = (Tooltip = "Character equip animation montage"))
 	TSoftObjectPtr<UAnimMontage> CharacterEquipMontage{nullptr};
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animations|Character")
+	
+	// Character unequip animation montage
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Character Animations", Meta = (Tooltip = "Character unequip animation montage"))
 	TSoftObjectPtr<UAnimMontage> CharacterUnEquipMontage{nullptr};
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animations|Character")
+	
+	// Character fire animation montage
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Character Animations", Meta = (Tooltip = "Character fire animation montage"))
 	TSoftObjectPtr<UAnimMontage> CharacterFireMontage{nullptr};
 
-	// Weapon Animations
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animations|Weapon")
-	TSoftObjectPtr<UAnimSequence> WeaponEquipAnim{nullptr};
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animations|Weapon")
-	TSoftObjectPtr<UAnimSequence> WeaponUnEquipAnim{nullptr};
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animations|Weapon")
-	TSoftObjectPtr<UAnimSequence> WeaponFireAnim{nullptr};
+	// ----------- Weapon Animations -----------
+	// Weapon equip animation sequence
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Animations", Meta = (Tooltip = "Weapon equip animation sequence"))
+	TSoftObjectPtr<UAnimSequence> WeaponEquipAnimation{nullptr};
 	
-	// Attack / Fire
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attack|Behavior")
+	// Weapon unequip animation sequence
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Animations", Meta = (Tooltip = "Weapon unequip animation sequence"))
+	TSoftObjectPtr<UAnimSequence> WeaponUnEquipAnimation{nullptr};
+	
+	// Weapon fire animation sequence
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Animations", Meta = (Tooltip = "Weapon fire animation sequence"))
+	TSoftObjectPtr<UAnimSequence> WeaponFireAnimations{nullptr};
+	
+	// ----------- Attack/Fire Behavior -----------
+	// Socket for attaching the weapon to the hand
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attack/Fire Behavior", Meta = (Tooltip = "Socket for attaching the weapon to the hand"))
 	FName HandSocket{};
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attack|Behavior")
+	
+	// Rotation fix for the hand when using the weapon
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attack/Fire Behavior", Meta = (Tooltip = "Rotation fix for the hand when using the weapon"))
 	FRotator HandRotatorFix{FRotator::ZeroRotator};
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attack|Behavior")
+	
+	// Array of socket names for holstering the weapon
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attack/Fire Behavior", Meta = (Tooltip = "Array of socket names for holstering the weapon"))
 	TArray<FName> HolsterSocket{};
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attack|Behavior")
+	
+	// Rotation fix for holstering the weapon
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attack/Fire Behavior", Meta = (Tooltip = "Rotation fix for holstering the weapon"))
 	FRotator HolsterRotatorFix{FRotator::ZeroRotator};
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attack|Behavior")
+	
+	// Socket for the muzzle of the weapon
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attack/Fire Behavior", Meta = (Tooltip = "Socket for the muzzle of the weapon"))
 	FName MuzzleSocket{};
 
-	// Fade
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fade")
+	// ----------- Fade Effects -----------
+	// Should the weapon fade in/out when equipped/holstered?
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fade Effects", Meta = (Tooltip = "Should the weapon fade in/out when equipped/holstered?"))
 	bool bShouldFade{true};
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fade")
-	float HolsterFadeVelocity{1.0f};
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fade")
-	float EquipFadeVelocity{1.0f};
+	
+	// Speed at which the weapon fades when holstered
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fade Effects", Meta = (Tooltip = "Speed at which the weapon fades when holstered"))
+	float HolsterFadeSpeed{1.0f};
+	
+	// Speed at which the weapon fades when equipped
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fade Effects", Meta = (Tooltip = "Speed at which the weapon fades when equipped"))
+	float EquipFadeSpeed{1.0f};
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "SFX")
+	// ----------- Sound Effects -----------
+	// Sound played when the weapon is equipped
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound Effects", Meta = (Tooltip = "Sound played when the weapon is equipped"))
 	TSoftObjectPtr<USoundBase> EquipSound{nullptr};
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "SFX")
+	
+	// Sound played when the weapon is holstered
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound Effects", Meta = (Tooltip = "Sound played when the weapon is holstered"))
 	TSoftObjectPtr<USoundBase> HolsterSound{nullptr};
 };
 
@@ -298,6 +334,8 @@ struct FFireWeaponData : public FTableRowBase
 	TSoftObjectPtr<USoundBase> FireSound{nullptr};
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "SFX")
 	TSoftObjectPtr<USoundBase> SilencedFireSound{nullptr};
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sounds", Meta = (Tooltip = "Sound attenuation for firing the weapon"))
+	TSoftObjectPtr<USoundAttenuation> FireSoundAttenuation{nullptr};
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "SFX")
 	TSoftObjectPtr<USoundBase> EmptyMagSound{nullptr};
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "SFX")
@@ -310,8 +348,6 @@ struct FFireWeaponData : public FTableRowBase
 	// Character Animations
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animations")
 	TSoftObjectPtr<UAnimMontage> CharacterReloadMontage{nullptr};
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animations")
-	FGameplayTagContainer FireAnimationMode{FscFireAnimationModeTags::UseProceduralFireAnimation};
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animations")
 	FRecoilAnimData CharacterFireAnim;
 	
